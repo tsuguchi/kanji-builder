@@ -1,0 +1,11 @@
+# Kanji Builder — data pipeline dependencies
+#
+# Step 1 (KANJIDIC2 download + parse) uses Python standard library only:
+#   urllib.request, gzip, xml.etree.ElementTree, sqlite3, json, pathlib.
+#
+# Future pipeline steps may add:
+#   - lxml          # faster XML parsing for JMdict (~200k entries)
+#   - tqdm          # progress bars for long-running steps
+#   - svgelements   # KanjiVG SVG cleanup/optimization
+#
+# Minimum Python: 3.10  (uses PEP 604 union syntax `int | None`)
