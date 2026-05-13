@@ -39,17 +39,22 @@ generated data files are excluded from the repository via `.gitignore`.
 
 | Source | Content | License |
 |---|---|---|
-| [KANJIDIC2](https://www.edrdg.org/wiki/index.php/KANJIDIC_Project) | Kanji info (readings, meanings, JLPT, grade) | CC BY-SA 4.0 (EDRDG) |
+| [KANJIDIC2](https://www.edrdg.org/wiki/index.php/KANJIDIC_Project) | Kanji info (readings, meanings, old JLPT, grade) | CC BY-SA 4.0 (EDRDG) |
 | [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) | Japanese–multilingual dictionary | CC BY-SA 4.0 (EDRDG) |
 | [KRADFILE / RADKFILE](https://www.edrdg.org/krad/kradinf.html) | Kanji ↔ radical decomposition | EDRDG License |
 | [KanjiVG](https://kanjivg.tagaini.net/) | Kanji stroke order SVG | CC BY-SA 3.0 |
 | [Tatoeba](https://tatoeba.org/) | Example sentence corpus | CC BY 2.0 FR |
-| JLPT vocab/kanji lists | Public lists, level grouping | Public |
+| [kanji-data](https://github.com/davidluzgouveia/kanji-data) | Modern JLPT N5–N1 mapping per kanji (post-2010) | MIT |
 
 The above data is used under their respective licenses. An in-app
 **Credits** screen will reproduce these acknowledgements. Per the
 SA (ShareAlike) clauses, derived data files are kept out of this
 repository so this project's source code is not auto-licensed CC BY-SA.
+
+Note on JLPT: the post-2010 JLPT (N5–N1) has no official kanji list. The
+`kanji-data` mapping is the community standard used by most learning apps;
+we adopt it for the `jlpt_new` column. The old JLPT levels (1–4) from
+KANJIDIC2 are retained in `jlpt_old` for reference.
 
 ## Project structure (planned)
 
@@ -60,10 +65,11 @@ kanji-builder/
 │   ├── 01_download_sources.py
 │   ├── 02_parse_kanjidic.py
 │   ├── 03_parse_kradfile.py
-│   ├── 04_parse_jmdict.py
-│   ├── 05_filter_tatoeba.py
-│   ├── 06_optimize_svg.py
-│   └── 07_build_bundle.py
+│   ├── 04_apply_jlpt_new.py
+│   ├── 05_parse_jmdict.py
+│   ├── 06_filter_tatoeba.py
+│   ├── 07_optimize_svg.py
+│   └── 08_build_bundle.py
 ├── data/                   # gitignored — generated artifacts
 │   ├── raw/                # downloaded source files
 │   └── bundle/             # final SQLite + SVG copied into android/app/src/main/assets/
