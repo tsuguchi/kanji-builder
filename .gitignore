@@ -1,0 +1,108 @@
+# ====================================================================
+# Kanji Builder — .gitignore
+# ====================================================================
+
+# --- macOS / Windows OS ----------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# --- Xcode / Swift ---------------------------------------------------
+## User settings
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+
+## Build products
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.swiftpm/
+.build/
+Package.resolved
+
+## CocoaPods (using only if introduced)
+Pods/
+
+## Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# --- Python (data pipeline) ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# --- Data sources & generated artifacts ------------------------------
+# Raw source data (CC BY-SA 4.0 etc. — fetched by scripts at build time)
+data/raw/
+data/sources/
+*.xml.gz
+*.gz
+
+# Generated bundle databases & assets
+data/bundle/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# KanjiVG SVGs (downloaded by pipeline)
+data/strokes/
+strokes/*.svg
+
+# Tatoeba dumps
+sentences.csv
+sentences.tar.bz2
+
+# --- Secrets / environment -------------------------------------------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.mobileprovision
+AuthKey_*.p8
+
+# --- IDE / editor ----------------------------------------------------
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# --- Logs & temp -----------------------------------------------------
+*.log
+logs/
+tmp/
+.tmp/
