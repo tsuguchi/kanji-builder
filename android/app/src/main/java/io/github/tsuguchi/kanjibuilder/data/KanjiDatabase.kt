@@ -41,7 +41,7 @@ abstract class KanjiDatabase : RoomDatabase() {
                 "kanji.db",
             )
                 .createFromAsset("kanji.sqlite")
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigration()
                 .build()
     }
 }
