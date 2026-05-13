@@ -2,11 +2,12 @@
 """Download upstream Japanese language data sources for Kanji Builder.
 
 Sources & licenses (see project README for full attribution):
-  - KANJIDIC2: https://www.edrdg.org/kanjidic/kanjidic2.xml.gz   (CC BY-SA 4.0)
-  - KRADFILE:  http://ftp.edrdg.org/pub/Nihongo/kradzip.zip       (EDRDG License)
-  - JMdict:    https://www.edrdg.org/pub/Nihongo/JMdict_e.gz     (CC BY-SA 4.0) (TODO)
-  - KanjiVG:   https://github.com/KanjiVG/kanjivg/releases        (CC BY-SA 3.0) (TODO)
-  - Tatoeba:   https://downloads.tatoeba.org/exports/sentences.tar.bz2 (CC BY 2.0 FR) (TODO)
+  - KANJIDIC2:   https://www.edrdg.org/kanjidic/kanjidic2.xml.gz                       (CC BY-SA 4.0)
+  - KRADFILE:    http://ftp.edrdg.org/pub/Nihongo/kradzip.zip                          (EDRDG License)
+  - kanji-data:  davidluzgouveia/kanji-data — provides modern N5-N1 mapping            (MIT)
+  - JMdict:      https://www.edrdg.org/pub/Nihongo/JMdict_e.gz                         (CC BY-SA 4.0) (TODO)
+  - KanjiVG:     https://github.com/KanjiVG/kanjivg/releases                            (CC BY-SA 3.0) (TODO)
+  - Tatoeba:     https://downloads.tatoeba.org/exports/sentences.tar.bz2               (CC BY 2.0 FR) (TODO)
 
 All files land in data/raw/. Compressed/zipped sources are auto-extracted.
 Re-running is idempotent: existing extracted files are skipped.
@@ -42,9 +43,9 @@ RAW_DIR = PROJECT_ROOT / "data" / "raw"
 class Source:
     name: str
     url: str
-    archive: str                 # archive filename under data/raw/
-    fmt: Literal["gzip", "zip"]  # how to extract
-    members: list[str]           # gzip: [output filename]; zip: [member1, member2, ...]
+    archive: str                          # local filename under data/raw/
+    fmt: Literal["gzip", "zip", "plain"]  # how to handle after download
+    members: list[str]                    # gzip/plain: [output filename]; zip: [member1, ...]
     license: str
 
 
@@ -64,6 +65,14 @@ SOURCES: list[Source] = [
         fmt="zip",
         members=["kradfile", "kradfile2"],
         license="EDRDG License",
+    ),
+    Source(
+        name="kanji-data",
+        url="https://raw.githubusercontent.com/davidluzgouveia/kanji-data/master/kanji.json",
+        archive="kanji-data.json",
+        fmt="plain",
+        members=["kanji-data.json"],
+        license="MIT (davidluzgouveia/kanji-data) — provides JLPT N5-N1 mapping",
     ),
 ]
 
@@ -140,6 +149,15 @@ def fetch(source: Source, force: bool) -> None:
         extract_gzip(archive, source.members[0], RAW_DIR, force)
     elif source.fmt == "zip":
         extract_zip(archive, source.members, RAW_DIR, force)
+    elif source.fmt == "plain":
+        # plain: no extraction, the downloaded file IS the data file.
+        # If archive name differs from member name, ensure the member is present.
+        for want in source.members:
+            if want != source.archive:
+                dest = RAW_DIR / want
+                if not dest.exists() or force:
+                    shutil.copyfile(archive, dest)
+                    print(f"  [copy]   {archive.name} -> {dest.name}")
     else:
         raise SystemExit(f"Unknown format: {source.fmt}")
 
