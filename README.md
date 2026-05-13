@@ -5,7 +5,32 @@ then combine kanji to build words. Android native, Kotlin + Jetpack Compose.
 
 ## Status
 
-Early planning. No code yet.
+Early development. Android scaffold + Python data pipeline (KANJIDIC2,
+KRADFILE, JLPT N5–N1 mapping) are in place. Gameplay not implemented yet.
+
+## Getting started
+
+```bash
+# 1. Generate the bundled SQLite (one-time, after a fresh clone)
+python scripts/01_download_sources.py
+python scripts/02_parse_kanjidic.py
+python scripts/03_parse_kradfile.py
+python scripts/04_apply_jlpt_new.py
+
+# 2. Open the Android project in Android Studio
+#    File -> Open -> select the android/ directory
+#    Let AS sync Gradle (first sync downloads the Android SDK if missing)
+#    Run on emulator or device — the smoke screen confirms the DB loaded.
+
+# OR build from the command line (after the SDK is set up):
+cd android
+./gradlew assembleDebug    # produces app/build/outputs/apk/debug/app-debug.apk
+```
+
+The Gradle `:app:preBuild` task copies `data/bundle/kanji.sqlite` into
+`android/app/src/main/assets/kanji.sqlite` automatically. If you skip the
+Python pipeline, the app still builds but the smoke screen will fail at
+runtime because the asset is missing.
 
 ## Concept
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kanji Builder</string>
+    <string name="smoke_title">Database smoke test</string>
+    <string name="smoke_loading">Loading kanji.sqlite…</string>
+    <string name="smoke_error">Failed to load: %1$s</string>
+    <string name="smoke_summary_kanji">Total kanji: %1$d</string>
+    <string name="smoke_summary_n5">N5 kanji: %1$d</string>
+    <string name="smoke_summary_radicals">Distinct radicals: %1$d</string>
+    <string name="smoke_summary_edges">kanji↔radical edges: %1$d</string>
+    <string name="smoke_n5_sample">N5 sample (by frequency):</string>
+</resources>
