@@ -1,7 +1,7 @@
 # Kanji Builder
 
 A puzzle game for Japanese learners — combine radicals (部首) to build kanji,
-then combine kanji to build words. iOS native, SwiftUI.
+then combine kanji to build words. Android native, Kotlin + Jetpack Compose.
 
 ## Status
 
@@ -20,12 +20,14 @@ Early planning. No code yet.
 
 | Layer | Choice |
 |---|---|
-| App | Swift / SwiftUI (iOS 17+) |
-| Game animation | SpriteKit (where needed) |
-| Local persistence | SwiftData (user progress) |
-| Static data | Bundled SQLite via GRDB.swift |
-| Data pipeline | Python (Windows-side) |
-| CI | GitHub Actions (Lint on Linux; iOS build local or self-hosted) |
+| App | Kotlin + Jetpack Compose (min API 26 / Android 8.0) |
+| Game animation | Compose `Canvas` + `animate*AsState`; Compose Multiplatform-ready where possible |
+| Local persistence | Room (SQLite) for user progress |
+| Static data | Pre-built SQLite shipped in `assets/`, opened via Room `createFromAsset` |
+| Data pipeline | Python 3.12 (Windows-side) — see `scripts/` |
+| Build system | Gradle (Kotlin DSL) |
+| CI | GitHub Actions: ktlint/detekt + Gradle test on `ubuntu-latest` (cheap), assemble on tag only |
+| Distribution | Google Play (developer registration $25 one-time) |
 
 See [docs/data-model.md](docs/data-model.md) once written for schema details.
 
@@ -53,21 +55,26 @@ repository so this project's source code is not auto-licensed CC BY-SA.
 
 ```
 kanji-builder/
-├── ios/                    # Xcode project (SwiftUI app)
+├── android/                # Android Studio project (Kotlin + Compose)
 ├── scripts/                # Python data pipeline
 │   ├── 01_download_sources.py
 │   ├── 02_parse_kanjidic.py
-│   ├── 03_parse_jmdict.py
-│   ├── 04_parse_kradfile.py
+│   ├── 03_parse_kradfile.py
+│   ├── 04_parse_jmdict.py
 │   ├── 05_filter_tatoeba.py
 │   ├── 06_optimize_svg.py
 │   └── 07_build_bundle.py
 ├── data/                   # gitignored — generated artifacts
 │   ├── raw/                # downloaded source files
-│   └── bundle/             # final SQLite + SVG for app bundling
+│   └── bundle/             # final SQLite + SVG copied into android/app/src/main/assets/
 ├── docs/                   # design docs
 └── .github/workflows/      # CI
 ```
+
+The Python pipeline emits `kanji.sqlite` once, and the Android build step
+copies it into the app's `assets/` (or the script writes there directly).
+The same database file would also work on iOS if a future port is built —
+the data layer is platform-neutral.
 
 ## License
 
