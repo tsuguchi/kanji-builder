@@ -1,20 +1,16 @@
+import { Link } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getKanjiByJlptNew, getRadicalsForKanji } from '@/db/queries';
-import type { Kanji, RadicalDecomposition } from '@/db/types';
+import { getKanjiByJlptNew } from '@/db/queries';
+import type { Kanji } from '@/db/types';
 
-interface KanjiWithRadicals {
-  kanji: Kanji;
-  radicals: RadicalDecomposition[];
-}
-
-export default function HomeScreen() {
+export default function StageSelectionScreen() {
   const db = useSQLiteContext();
-  const [items, setItems] = useState<KanjiWithRadicals[] | null>(null);
+  const [stages, setStages] = useState<Kanji[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,13 +18,7 @@ export default function HomeScreen() {
     (async () => {
       try {
         const n5 = await getKanjiByJlptNew(db, 5);
-        const enriched = await Promise.all(
-          n5.map(async (kanji) => ({
-            kanji,
-            radicals: await getRadicalsForKanji(db, kanji.character),
-          })),
-        );
-        if (!cancelled) setItems(enriched);
+        if (!cancelled) setStages(n5);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       }
@@ -47,7 +37,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (items === null) {
+  if (stages === null) {
     return (
       <ThemedView style={styles.centered}>
         <ActivityIndicator />
@@ -58,34 +48,34 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="title">N5 Kanji</ThemedText>
-        <ThemedText type="subtitle">{items.length} characters</ThemedText>
+        <ThemedText type="title">N5 Stages</ThemedText>
+        <ThemedText type="subtitle">{stages.length} kanji to build</ThemedText>
       </View>
       <FlatList
-        data={items}
-        keyExtractor={(item) => item.kanji.character}
+        data={stages}
+        keyExtractor={(item) => item.character}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => <KanjiRow item={item} />}
+        renderItem={({ item, index }) => <StageRow stage={item} order={index + 1} />}
       />
     </ThemedView>
   );
 }
 
-function KanjiRow({ item }: { item: KanjiWithRadicals }) {
-  const { kanji, radicals } = item;
-  const radicalLabel = radicals.length
-    ? radicals.map((r) => (r.count > 1 ? `${r.radicalChar}×${r.count}` : r.radicalChar)).join(' ')
-    : '(no decomposition)';
+function StageRow({ stage, order }: { stage: Kanji; order: number }) {
   return (
-    <View style={styles.row}>
-      <ThemedText style={styles.glyph}>{kanji.character}</ThemedText>
-      <View style={styles.rowBody}>
-        <ThemedText type="defaultSemiBold">{kanji.meaningsEn.slice(0, 3).join(', ')}</ThemedText>
-        <ThemedText style={styles.meta}>
-          {kanji.strokeCount} strokes · radicals: {radicalLabel}
-        </ThemedText>
-      </View>
-    </View>
+    <Link href={`/stage/${stage.character}`} asChild>
+      <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+        <ThemedText style={styles.order}>{String(order).padStart(2, '0')}</ThemedText>
+        <ThemedText style={styles.glyph}>{stage.character}</ThemedText>
+        <View style={styles.rowBody}>
+          <ThemedText type="defaultSemiBold">
+            {stage.meaningsEn.slice(0, 3).join(', ') || '—'}
+          </ThemedText>
+          <ThemedText style={styles.meta}>{stage.strokeCount} strokes</ThemedText>
+        </View>
+        <ThemedText style={styles.chevron}>›</ThemedText>
+      </Pressable>
+    </Link>
   );
 }
 
@@ -113,10 +103,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
     paddingVertical: 10,
+    paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8884',
+  },
+  rowPressed: {
+    opacity: 0.6,
+  },
+  order: {
+    width: 28,
+    fontSize: 13,
+    opacity: 0.5,
+    textAlign: 'right',
   },
   glyph: {
     fontSize: 40,
@@ -131,5 +131,10 @@ const styles = StyleSheet.create({
   meta: {
     opacity: 0.7,
     fontSize: 13,
+  },
+  chevron: {
+    fontSize: 26,
+    opacity: 0.35,
+    paddingHorizontal: 4,
   },
 });

@@ -19,6 +19,21 @@ export async function getKanjiByJlptNew(db: SQLiteDatabase, level: number): Prom
   return rows.map(decodeKanji);
 }
 
+/** Single kanji lookup by character. Returns null if absent (e.g. malformed route param). */
+export async function getKanjiByCharacter(
+  db: SQLiteDatabase,
+  character: string,
+): Promise<Kanji | null> {
+  const row = await db.getFirstAsync<KanjiRow>(
+    `SELECT character, stroke_count, jlpt_old, jouyou_grade, frequency_rank,
+            meanings_en, onyomi, kunyomi, radical_classical, jlpt_new
+       FROM kanji
+      WHERE character = ?`,
+    [character],
+  );
+  return row ? decodeKanji(row) : null;
+}
+
 /**
  * KRADFILE-derived radical decomposition for a single kanji. Ordered by
  * radical character for stable display.
