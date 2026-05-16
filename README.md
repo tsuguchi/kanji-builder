@@ -1,12 +1,16 @@
 # Kanji Builder
 
 A puzzle game for Japanese learners — combine radicals (部首) to build kanji,
-then combine kanji to build words. Android native, Kotlin + Jetpack Compose.
+then combine kanji to build words. Cross-platform mobile app built with Expo
+(React Native + TypeScript) targeting iOS and Android.
 
 ## Status
 
-Early development. Android scaffold + Python data pipeline (KANJIDIC2,
-KRADFILE, JLPT N5–N1 mapping) are in place. Gameplay not implemented yet.
+Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
+mapping) is in place. The mobile app scaffold is **pending** — we are migrating
+away from the previous Kotlin/Compose bootstrap to Expo so a single codebase
+can ship to both stores. See [docs/migration-2026-05.md](docs/migration-2026-05.md)
+(to be written) for the rationale.
 
 ## Getting started
 
@@ -17,20 +21,14 @@ python scripts/02_parse_kanjidic.py
 python scripts/03_parse_kradfile.py
 python scripts/04_apply_jlpt_new.py
 
-# 2. Open the Android project in Android Studio
-#    File -> Open -> select the android/ directory
-#    Let AS sync Gradle (first sync downloads the Android SDK if missing)
-#    Run on emulator or device — the smoke screen confirms the DB loaded.
-
-# OR build from the command line (after the SDK is set up):
-cd android
-./gradlew assembleDebug    # produces app/build/outputs/apk/debug/app-debug.apk
+# 2. (Coming soon) Run the Expo app
+#    npm install
+#    npx expo start
 ```
 
-The Gradle `:app:preBuild` task copies `data/bundle/kanji.sqlite` into
-`android/app/src/main/assets/kanji.sqlite` automatically. If you skip the
-Python pipeline, the app still builds but the smoke screen will fail at
-runtime because the asset is missing.
+The Python pipeline emits `data/bundle/kanji.sqlite`. Once the Expo project
+lands, that file will be copied into the app's `assets/` and read by
+`expo-sqlite` at runtime — no platform-specific build glue required.
 
 ## Concept
 
@@ -45,14 +43,16 @@ runtime because the asset is missing.
 
 | Layer | Choice |
 |---|---|
-| App | Kotlin + Jetpack Compose (min API 26 / Android 8.0) |
-| Game animation | Compose `Canvas` + `animate*AsState`; Compose Multiplatform-ready where possible |
-| Local persistence | Room (SQLite) for user progress |
-| Static data | Pre-built SQLite shipped in `assets/`, opened via Room `createFromAsset` |
+| App framework | Expo (React Native) + TypeScript |
+| UI | React Native primitives + a styling solution (Tamagui / NativeWind, TBD) |
+| Game animation | `react-native-svg` + `react-native-reanimated` |
+| Local persistence | `expo-sqlite` (+ Drizzle ORM, TBD) for user progress |
+| Static data | Pre-built SQLite shipped in `assets/`, opened via `expo-sqlite` |
 | Data pipeline | Python 3.12 (Windows-side) — see `scripts/` |
-| Build system | Gradle (Kotlin DSL) |
-| CI | GitHub Actions: ktlint/detekt + Gradle test on `ubuntu-latest` (cheap), assemble on tag only |
-| Distribution | Google Play (developer registration $25 one-time) |
+| Build | EAS Build (cloud) — produces iOS .ipa and Android .aab without a local Mac |
+| Submit | EAS Submit — uploads directly to App Store Connect and Google Play |
+| CI | GitHub Actions: `tsc --noEmit` + lint + jest on `ubuntu-latest` (cheap) |
+| Distribution | Apple App Store ($99/year) + Google Play ($25 one-time) |
 
 See [docs/data-model.md](docs/data-model.md) once written for schema details.
 
@@ -85,8 +85,9 @@ KANJIDIC2 are retained in `jlpt_old` for reference.
 
 ```
 kanji-builder/
-├── android/                # Android Studio project (Kotlin + Compose)
-├── scripts/                # Python data pipeline
+├── app/                   # (coming) Expo source — screens, components, hooks
+├── assets/                # (coming) bundled kanji.sqlite + SVG, icons, fonts
+├── scripts/               # Python data pipeline
 │   ├── 01_download_sources.py
 │   ├── 02_parse_kanjidic.py
 │   ├── 03_parse_kradfile.py
@@ -95,17 +96,16 @@ kanji-builder/
 │   ├── 06_filter_tatoeba.py
 │   ├── 07_optimize_svg.py
 │   └── 08_build_bundle.py
-├── data/                   # gitignored — generated artifacts
-│   ├── raw/                # downloaded source files
-│   └── bundle/             # final SQLite + SVG copied into android/app/src/main/assets/
-├── docs/                   # design docs
-└── .github/workflows/      # CI
+├── data/                  # gitignored — generated artifacts
+│   ├── raw/               # downloaded source files
+│   └── bundle/            # final SQLite + SVG copied into assets/
+├── docs/                  # design docs
+└── .github/workflows/     # CI
 ```
 
-The Python pipeline emits `kanji.sqlite` once, and the Android build step
-copies it into the app's `assets/` (or the script writes there directly).
-The same database file would also work on iOS if a future port is built —
-the data layer is platform-neutral.
+The Python pipeline emits a platform-neutral SQLite file. The same database
+serves both iOS and Android since `expo-sqlite` reads identical bytes on each
+platform — no per-OS build step required.
 
 ## License
 
