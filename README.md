@@ -7,10 +7,10 @@ then combine kanji to build words. Cross-platform mobile app built with Expo
 ## Status
 
 Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
-mapping) is in place. The mobile app scaffold is **pending** — we are migrating
-away from the previous Kotlin/Compose bootstrap to Expo so a single codebase
-can ship to both stores. See [docs/migration-2026-05.md](docs/migration-2026-05.md)
-(to be written) for the rationale.
+mapping) and the Expo (React Native + TypeScript) app shell are in place.
+The shell currently shows the Expo Router tabs template — kanji-building
+gameplay is not implemented yet. Data integration via `expo-sqlite` is the
+next milestone (see follow-up PR `feat/expo-sqlite-integration`).
 
 ## Getting started
 
@@ -21,14 +21,25 @@ python scripts/02_parse_kanjidic.py
 python scripts/03_parse_kradfile.py
 python scripts/04_apply_jlpt_new.py
 
-# 2. (Coming soon) Run the Expo app
-#    npm install
-#    npx expo start
+# 2. Install JS dependencies and start the Expo dev server
+npm install
+npm run start          # opens the Expo CLI; press a / i / w to launch
+npm run android        # launch directly on an Android emulator / device
+npm run ios            # launch on an iOS simulator (requires macOS)
+npm run web            # run in a browser
 ```
 
-The Python pipeline emits `data/bundle/kanji.sqlite`. Once the Expo project
-lands, that file will be copied into the app's `assets/` and read by
-`expo-sqlite` at runtime — no platform-specific build glue required.
+Quality gates (run before opening a PR):
+
+```bash
+npm run typecheck      # tsc --noEmit
+npm run lint           # ESLint (expo + prettier-compatible)
+npm run format:check   # Prettier --check
+```
+
+The Python pipeline emits `data/bundle/kanji.sqlite`. Once the data
+integration lands, that file will be copied into the app's `assets/` and
+read by `expo-sqlite` at runtime — no platform-specific build glue required.
 
 ## Concept
 
@@ -41,18 +52,18 @@ lands, that file will be copied into the app's `assets/` and read by
 
 ## Tech stack (planned)
 
-| Layer | Choice |
-|---|---|
-| App framework | Expo (React Native) + TypeScript |
-| UI | React Native primitives + a styling solution (Tamagui / NativeWind, TBD) |
-| Game animation | `react-native-svg` + `react-native-reanimated` |
-| Local persistence | `expo-sqlite` (+ Drizzle ORM, TBD) for user progress |
-| Static data | Pre-built SQLite shipped in `assets/`, opened via `expo-sqlite` |
-| Data pipeline | Python 3.12 (Windows-side) — see `scripts/` |
-| Build | EAS Build (cloud) — produces iOS .ipa and Android .aab without a local Mac |
-| Submit | EAS Submit — uploads directly to App Store Connect and Google Play |
-| CI | GitHub Actions: `tsc --noEmit` + lint + jest on `ubuntu-latest` (cheap) |
-| Distribution | Apple App Store ($99/year) + Google Play ($25 one-time) |
+| Layer             | Choice                                                                     |
+| ----------------- | -------------------------------------------------------------------------- |
+| App framework     | Expo (React Native) + TypeScript                                           |
+| UI                | React Native primitives + a styling solution (Tamagui / NativeWind, TBD)   |
+| Game animation    | `react-native-svg` + `react-native-reanimated`                             |
+| Local persistence | `expo-sqlite` (+ Drizzle ORM, TBD) for user progress                       |
+| Static data       | Pre-built SQLite shipped in `assets/`, opened via `expo-sqlite`            |
+| Data pipeline     | Python 3.12 (Windows-side) — see `scripts/`                                |
+| Build             | EAS Build (cloud) — produces iOS .ipa and Android .aab without a local Mac |
+| Submit            | EAS Submit — uploads directly to App Store Connect and Google Play         |
+| CI                | GitHub Actions: `tsc --noEmit` + lint + jest on `ubuntu-latest` (cheap)    |
+| Distribution      | Apple App Store ($99/year) + Google Play ($25 one-time)                    |
 
 See [docs/data-model.md](docs/data-model.md) once written for schema details.
 
@@ -62,14 +73,14 @@ This project uses the following openly-licensed Japanese language data.
 All are bundled at build time by the Python pipeline in `scripts/`; raw and
 generated data files are excluded from the repository via `.gitignore`.
 
-| Source | Content | License |
-|---|---|---|
+| Source                                                             | Content                                          | License              |
+| ------------------------------------------------------------------ | ------------------------------------------------ | -------------------- |
 | [KANJIDIC2](https://www.edrdg.org/wiki/index.php/KANJIDIC_Project) | Kanji info (readings, meanings, old JLPT, grade) | CC BY-SA 4.0 (EDRDG) |
-| [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html) | Japanese–multilingual dictionary | CC BY-SA 4.0 (EDRDG) |
-| [KRADFILE / RADKFILE](https://www.edrdg.org/krad/kradinf.html) | Kanji ↔ radical decomposition | EDRDG License |
-| [KanjiVG](https://kanjivg.tagaini.net/) | Kanji stroke order SVG | CC BY-SA 3.0 |
-| [Tatoeba](https://tatoeba.org/) | Example sentence corpus | CC BY 2.0 FR |
-| [kanji-data](https://github.com/davidluzgouveia/kanji-data) | Modern JLPT N5–N1 mapping per kanji (post-2010) | MIT |
+| [JMdict](https://www.edrdg.org/jmdict/j_jmdict.html)               | Japanese–multilingual dictionary                 | CC BY-SA 4.0 (EDRDG) |
+| [KRADFILE / RADKFILE](https://www.edrdg.org/krad/kradinf.html)     | Kanji ↔ radical decomposition                    | EDRDG License        |
+| [KanjiVG](https://kanjivg.tagaini.net/)                            | Kanji stroke order SVG                           | CC BY-SA 3.0         |
+| [Tatoeba](https://tatoeba.org/)                                    | Example sentence corpus                          | CC BY 2.0 FR         |
+| [kanji-data](https://github.com/davidluzgouveia/kanji-data)        | Modern JLPT N5–N1 mapping per kanji (post-2010)  | MIT                  |
 
 The above data is used under their respective licenses. An in-app
 **Credits** screen will reproduce these acknowledgements. Per the
