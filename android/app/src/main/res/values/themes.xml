@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Base application theme. The actual M3 colors come from Compose (see ui/theme/). -->
-    <style name="Theme.KanjiBuilder" parent="android:Theme.Material.Light.NoActionBar" />
-</resources>
