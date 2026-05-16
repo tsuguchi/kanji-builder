@@ -8,10 +8,6 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
 const DB_NAME = 'kanji.sqlite';
 // React Native's asset bundler resolves binary assets via require(); ESM
 // import would not give Metro a moduleId to bundle.
@@ -34,8 +30,8 @@ export default function RootLayout() {
       <SQLiteProvider databaseName={DB_NAME} assetSource={{ assetId: DB_ASSET }} useSuspense>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="stage/[character]" options={{ title: '' }} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>

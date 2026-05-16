@@ -10,10 +10,13 @@ then combine kanji to build words. Cross-platform mobile app built with Expo
 
 Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
 mapping) and the Expo (React Native + TypeScript) app shell are in place.
-The Home tab now loads the bundled SQLite via `expo-sqlite` and lists every
-N5 kanji with its radical decomposition — that is the current smoke test.
-Real gameplay (drag radicals → form kanji → score combos) is not implemented
-yet.
+The app now boots into an **N5 stage selection list**, and tapping a row
+opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
+readings, stroke count, and KRADFILE radical decomposition. The Expo Router
+template tabs/modal demo and its components have been removed.
+
+Real gameplay (drag radicals → form kanji → score combos, plus SRS-driven
+review scheduling) is the next milestone — see `feat/radical-building-mechanic`.
 
 ## Getting started
 
