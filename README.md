@@ -1,5 +1,7 @@
 # Kanji Builder
 
+[![CI](https://github.com/tsuguchi/kanji-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/tsuguchi/kanji-builder/actions/workflows/ci.yml)
+
 A puzzle game for Japanese learners — combine radicals (部首) to build kanji,
 then combine kanji to build words. Cross-platform mobile app built with Expo
 (React Native + TypeScript) targeting iOS and Android.
@@ -44,6 +46,12 @@ npm run typecheck      # tsc --noEmit
 npm run lint           # ESLint (expo + prettier-compatible)
 npm run format:check   # Prettier --check
 ```
+
+These three gates are also enforced in CI by
+[.github/workflows/ci.yml](.github/workflows/ci.yml) on every push to `main`
+and every pull request. CI runs on `ubuntu-latest` with Node 20 LTS and
+skips `npm run prepare-db` — the bundled `kanji.sqlite` is a runtime asset,
+not a build-time TypeScript dependency.
 
 The data layer is a thin wrapper over `expo-sqlite`:
 
