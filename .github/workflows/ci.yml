@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Only the most recent run of a given branch/PR needs to keep going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gates:
+    name: typecheck / lint / format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # `npm ci` is faster and stricter than `npm install` (fails on
+      # package-lock.json drift, doesn't mutate lockfile).
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # The pre-built kanji.sqlite is a runtime asset only — it lives at
+      # `assets/data/kanji.sqlite` and is `require()`'d by Metro. None of
+      # tsc / eslint / prettier touch the file, so we deliberately skip
+      # `npm run prepare-db` here. (CI does not have `data/bundle/kanji.sqlite`
+      # because the raw KANJIDIC2 / KRADFILE sources are not tracked.)
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Prettier check
+        run: npm run format:check
