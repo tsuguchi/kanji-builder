@@ -8,9 +8,10 @@ then combine kanji to build words. Cross-platform mobile app built with Expo
 
 Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
 mapping) and the Expo (React Native + TypeScript) app shell are in place.
-The shell currently shows the Expo Router tabs template — kanji-building
-gameplay is not implemented yet. Data integration via `expo-sqlite` is the
-next milestone (see follow-up PR `feat/expo-sqlite-integration`).
+The Home tab now loads the bundled SQLite via `expo-sqlite` and lists every
+N5 kanji with its radical decomposition — that is the current smoke test.
+Real gameplay (drag radicals → form kanji → score combos) is not implemented
+yet.
 
 ## Getting started
 
@@ -20,6 +21,7 @@ python scripts/01_download_sources.py
 python scripts/02_parse_kanjidic.py
 python scripts/03_parse_kradfile.py
 python scripts/04_apply_jlpt_new.py
+# → data/bundle/kanji.sqlite
 
 # 2. Install JS dependencies and start the Expo dev server
 npm install
@@ -29,6 +31,12 @@ npm run ios            # launch on an iOS simulator (requires macOS)
 npm run web            # run in a browser
 ```
 
+`npm run start` (and the platform-specific variants) automatically runs
+`npm run prepare-db` first, which copies `data/bundle/kanji.sqlite` into
+`assets/data/kanji.sqlite` so Metro bundles it with the app. If you invoke
+`npx expo start` directly instead, run `npm run prepare-db` manually first
+— Metro will fail to resolve the asset otherwise.
+
 Quality gates (run before opening a PR):
 
 ```bash
@@ -37,9 +45,14 @@ npm run lint           # ESLint (expo + prettier-compatible)
 npm run format:check   # Prettier --check
 ```
 
-The Python pipeline emits `data/bundle/kanji.sqlite`. Once the data
-integration lands, that file will be copied into the app's `assets/` and
-read by `expo-sqlite` at runtime — no platform-specific build glue required.
+The data layer is a thin wrapper over `expo-sqlite`:
+
+- [`db/types.ts`](db/types.ts) — TypeScript types mirroring the SQLite schema
+  (`Kanji`, `RadicalDecomposition`, JSON-decoding helpers).
+- [`db/queries.ts`](db/queries.ts) — typed query helpers (`getKanjiByJlptNew`,
+  `getRadicalsForKanji`).
+- [`app/_layout.tsx`](app/_layout.tsx) — wraps the app in `<SQLiteProvider>`,
+  loading the bundled asset via `assetSource={{ assetId: require(...) }}`.
 
 ## Concept
 
