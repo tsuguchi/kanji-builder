@@ -27,8 +27,12 @@ ever placed during the attempt) advances the stage by 1; a **solve with at
 least one distractor placed** drops the stage by 1 (floored at 1, no
 penalty on first introduction). The success banner is green for clean
 solves and orange for solves-with-mistake. Pressing Reset starts a fresh
-attempt and clears the mistake flag. Drag-and-drop input is still future
-work.
+attempt and clears the mistake flag. After solving, if other kanji are
+still **due for review** the detail screen surfaces a green "Next due: X
+→" button that navigates (via Stack `replace`, so back-navigation still
+returns to Reviews or Stages, not through every previously-visited stage)
+straight to the next overdue kanji — enabling a quick "session loop"
+through the review queue. Drag-and-drop input is still future work.
 
 ## Getting started
 
