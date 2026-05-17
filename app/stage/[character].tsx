@@ -1,13 +1,13 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BuildSection } from '@/components/game/build-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useProgressDb } from '@/db/progress-context';
-import { getProgressFor, recordSolve } from '@/db/progress-queries';
+import { getDueProgress, getProgressFor, recordSolve } from '@/db/progress-queries';
 import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
 import { getDistractorRadicals, getKanjiByCharacter, getRadicalsForKanji } from '@/db/queries';
 import type { Kanji, RadicalDecomposition } from '@/db/types';
@@ -26,6 +26,7 @@ export default function StageDetailScreen() {
   const progressDb = useProgressDb();
   const [data, setData] = useState<StageData | null>(null);
   const [progress, setProgress] = useState<KanjiProgress | null>(null);
+  const [nextDueCharacter, setNextDueCharacter] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +52,9 @@ export default function StageDetailScreen() {
         if (!cancelled) {
           setData({ kanji, radicals, distractors });
           setProgress(existingProgress);
+          // Clear stale next-due nudge from the previous stage; it will be
+          // recomputed when the user solves this one.
+          setNextDueCharacter(null);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -61,11 +65,23 @@ export default function StageDetailScreen() {
     };
   }, [db, progressDb, character]);
 
-  const handleFirstSolve = (result: { hadMistake: boolean }) => {
+  const handleFirstSolve = async (result: { hadMistake: boolean }) => {
     if (!character) return;
-    recordSolve(progressDb, character, result)
-      .then(setProgress)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    try {
+      const newProgress = await recordSolve(progressDb, character, result);
+      setProgress(newProgress);
+      // Surface a "Next due →" call-to-action so the user can chain review
+      // sessions without bouncing back to the Reviews list. The just-solved
+      // kanji has its `next_review_at` pushed into the future by recordSolve,
+      // so it will not appear in `getDueProgress` again — but we still skip
+      // it defensively in case the SRS interval is shorter than the query
+      // round-trip.
+      const due = await getDueProgress(progressDb);
+      const next = due.find((p) => p.character !== character)?.character ?? null;
+      setNextDueCharacter(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   };
 
   if (error) {
@@ -156,6 +172,21 @@ export default function StageDetailScreen() {
           distractorChars={distractors}
           onFirstSolve={handleFirstSolve}
         />
+
+        {nextDueCharacter && (
+          <Link href={`/stage/${nextDueCharacter}`} replace asChild>
+            <Pressable
+              style={({ pressed }) => [
+                styles.nextDueButton,
+                pressed && styles.nextDueButtonPressed,
+              ]}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.nextDueButtonText}>
+                Next due: {nextDueCharacter} →
+              </ThemedText>
+            </Pressable>
+          </Link>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -246,6 +277,20 @@ const styles = StyleSheet.create({
   progressMeta: {
     opacity: 0.6,
     fontSize: 13,
+  },
+  nextDueButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#3a9d3a',
+  },
+  nextDueButtonPressed: {
+    opacity: 0.6,
+  },
+  nextDueButtonText: {
+    color: '#fff',
+    fontSize: 15,
   },
   heroMeta: {
     opacity: 0.6,
