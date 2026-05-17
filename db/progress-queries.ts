@@ -20,6 +20,46 @@ function decode(row: ProgressRow): KanjiProgress {
   };
 }
 
+/**
+ * Progress rows currently due for review (`next_review_at <= now`).
+ * Ordered most-overdue first.
+ */
+export async function getDueProgress(
+  db: SQLiteDatabase,
+  now: number = Date.now(),
+): Promise<KanjiProgress[]> {
+  const rows = await db.getAllAsync<ProgressRow>(
+    `SELECT character,
+            srs_stage         AS srsStage,
+            cleared_at        AS clearedAt,
+            last_reviewed_at  AS lastReviewedAt,
+            next_review_at    AS nextReviewAt
+       FROM kanji_progress
+      WHERE next_review_at <= ?
+      ORDER BY next_review_at ASC`,
+    [now],
+  );
+  return rows.map(decode);
+}
+
+/**
+ * Earliest `next_review_at` in the future (i.e. closest upcoming review),
+ * or `null` if there are no future reviews scheduled. Used by the Reviews
+ * empty state to tell the user when to come back.
+ */
+export async function getNextUpcomingReviewAt(
+  db: SQLiteDatabase,
+  now: number = Date.now(),
+): Promise<number | null> {
+  const row = await db.getFirstAsync<{ nextReviewAt: number }>(
+    `SELECT MIN(next_review_at) AS nextReviewAt
+       FROM kanji_progress
+      WHERE next_review_at > ?`,
+    [now],
+  );
+  return row?.nextReviewAt ?? null;
+}
+
 /** All cleared kanji with their SRS state. Empty array = no clears yet. */
 export async function getAllProgress(db: SQLiteDatabase): Promise<KanjiProgress[]> {
   const rows = await db.getAllAsync<ProgressRow>(

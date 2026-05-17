@@ -59,6 +59,8 @@ export default function StageSelectionScreen() {
   }
 
   const clearedCount = progress.size;
+  const now = Date.now();
+  const dueCount = Array.from(progress.values()).filter((p) => p.nextReviewAt <= now).length;
 
   return (
     <ThemedView style={styles.container}>
@@ -67,6 +69,17 @@ export default function StageSelectionScreen() {
         <ThemedText type="subtitle">
           {clearedCount}/{stages.length} cleared
         </ThemedText>
+        {dueCount > 0 && (
+          <Link href="/reviews" asChild>
+            <Pressable
+              style={({ pressed }) => [styles.reviewsCta, pressed && styles.reviewsCtaPressed]}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.reviewsCtaText}>
+                {dueCount} review{dueCount > 1 ? 's' : ''} due →
+              </ThemedText>
+            </Pressable>
+          </Link>
+        )}
       </View>
       <FlatList
         data={stages}
@@ -133,6 +146,21 @@ const styles = StyleSheet.create({
     paddingTop: 64,
     paddingBottom: 12,
     gap: 4,
+  },
+  reviewsCta: {
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#c66',
+    alignSelf: 'flex-start',
+  },
+  reviewsCtaPressed: {
+    opacity: 0.6,
+  },
+  reviewsCtaText: {
+    color: '#fff',
+    fontSize: 14,
   },
   list: {
     paddingHorizontal: 16,
