@@ -11,16 +11,19 @@ then combine kanji to build words. Cross-platform mobile app built with Expo
 Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
 mapping) and the Expo (React Native + TypeScript) app shell are in place.
 The app boots into an **N5 stage selection list** (each row shows ✓ once
-cleared and a "Due" badge when review is overdue), and tapping a row opens a
-**stage detail screen** showing the kanji glyph, meanings, on/kun readings,
-stroke count, KRADFILE radical decomposition, an SRS progress summary, and a
-**tap-select build mini-game**: tap chips from an available pool (correct
-radicals + 3 distractors) into a build zone, and the game declares the kanji
-"correct" when the placed multiset matches the target. Each first solve in a
-detail-screen visit advances a WaniKani-inspired 8-stage SRS stored in a
-separate writable `progress.sqlite` (4h → 8h → 1d → 2d → 1w → 2w → 1mo →
-4mo intervals). Drag-and-drop input and a dedicated review queue screen are
-still future work.
+cleared and a "Due" badge when review is overdue); the header surfaces a
+**"N reviews due →" call-to-action** that opens a dedicated **Reviews
+screen** listing only the currently-overdue kanji (sorted most-overdue
+first, empty state shows the next upcoming review time). Tapping any row
+opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
+readings, stroke count, KRADFILE radical decomposition, an SRS progress
+summary, and a **tap-select build mini-game**: tap chips from an available
+pool (correct radicals + 3 distractors) into a build zone, and the game
+declares the kanji "correct" when the placed multiset matches the target.
+Each first solve in a detail-screen visit advances a WaniKani-inspired
+8-stage SRS stored in a separate writable `progress.sqlite` (4h → 8h → 1d
+→ 2d → 1w → 2w → 1mo → 4mo intervals). Drag-and-drop input and mistake
+handling are still future work.
 
 ## Getting started
 

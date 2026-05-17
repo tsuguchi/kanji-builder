@@ -19,6 +19,32 @@ export async function getKanjiByJlptNew(db: SQLiteDatabase, level: number): Prom
   return rows.map(decodeKanji);
 }
 
+/**
+ * Bulk kanji lookup. Returned order matches `characters`; characters not in
+ * the DB are silently dropped. Used by the Reviews screen, which has a list
+ * of characters from `progress.sqlite` and needs the matching kanji metadata
+ * from the bundled DB (cross-DB JOIN is not possible).
+ */
+export async function getKanjiByCharacters(
+  db: SQLiteDatabase,
+  characters: readonly string[],
+): Promise<Kanji[]> {
+  if (characters.length === 0) return [];
+  const placeholders = characters.map(() => '?').join(', ');
+  const rows = await db.getAllAsync<KanjiRow>(
+    `SELECT character, stroke_count, jlpt_old, jouyou_grade, frequency_rank,
+            meanings_en, onyomi, kunyomi, radical_classical, jlpt_new
+       FROM kanji
+      WHERE character IN (${placeholders})`,
+    [...characters],
+  );
+  const byChar = new Map(rows.map((r) => [r.character, decodeKanji(r)]));
+  return characters.flatMap((c) => {
+    const k = byChar.get(c);
+    return k ? [k] : [];
+  });
+}
+
 /** Single kanji lookup by character. Returns null if absent (e.g. malformed route param). */
 export async function getKanjiByCharacter(
   db: SQLiteDatabase,
