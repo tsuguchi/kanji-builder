@@ -3,14 +3,18 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
+import { BuildSection } from '@/components/game/build-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getKanjiByCharacter, getRadicalsForKanji } from '@/db/queries';
+import { getDistractorRadicals, getKanjiByCharacter, getRadicalsForKanji } from '@/db/queries';
 import type { Kanji, RadicalDecomposition } from '@/db/types';
+
+const DISTRACTOR_COUNT = 3;
 
 interface StageData {
   kanji: Kanji;
   radicals: RadicalDecomposition[];
+  distractors: string[];
 }
 
 export default function StageDetailScreen() {
@@ -31,7 +35,14 @@ export default function StageDetailScreen() {
           return;
         }
         const radicals = await getRadicalsForKanji(db, character);
-        if (!cancelled) setData({ kanji, radicals });
+        const level = kanji.jlptNew ?? 5;
+        const distractors = await getDistractorRadicals(
+          db,
+          level,
+          radicals.map((r) => r.radicalChar),
+          DISTRACTOR_COUNT,
+        );
+        if (!cancelled) setData({ kanji, radicals, distractors });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       }
@@ -70,7 +81,7 @@ export default function StageDetailScreen() {
     );
   }
 
-  const { kanji, radicals } = data;
+  const { kanji, radicals, distractors } = data;
 
   return (
     <ThemedView style={styles.container}>
@@ -114,6 +125,12 @@ export default function StageDetailScreen() {
             </View>
           )}
         </Section>
+
+        <BuildSection
+          targetCharacter={kanji.character}
+          correctRadicals={radicals}
+          distractorChars={distractors}
+        />
       </ScrollView>
     </ThemedView>
   );
