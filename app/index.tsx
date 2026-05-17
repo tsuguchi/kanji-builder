@@ -1,32 +1,45 @@
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useProgressDb } from '@/db/progress-context';
+import { getAllProgress } from '@/db/progress-queries';
+import type { KanjiProgress } from '@/db/progress-types';
 import { getKanjiByJlptNew } from '@/db/queries';
 import type { Kanji } from '@/db/types';
 
 export default function StageSelectionScreen() {
   const db = useSQLiteContext();
+  const progressDb = useProgressDb();
   const [stages, setStages] = useState<Kanji[] | null>(null);
+  const [progress, setProgress] = useState<Map<string, KanjiProgress>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const n5 = await getKanjiByJlptNew(db, 5);
-        if (!cancelled) setStages(n5);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [db]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const [n5, allProgress] = await Promise.all([
+            getKanjiByJlptNew(db, 5),
+            getAllProgress(progressDb),
+          ]);
+          if (!cancelled) {
+            setStages(n5);
+            setProgress(new Map(allProgress.map((p) => [p.character, p])));
+          }
+        } catch (e) {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [db, progressDb]),
+  );
 
   if (error) {
     return (
@@ -45,23 +58,40 @@ export default function StageSelectionScreen() {
     );
   }
 
+  const clearedCount = progress.size;
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <ThemedText type="title">N5 Stages</ThemedText>
-        <ThemedText type="subtitle">{stages.length} kanji to build</ThemedText>
+        <ThemedText type="subtitle">
+          {clearedCount}/{stages.length} cleared
+        </ThemedText>
       </View>
       <FlatList
         data={stages}
         keyExtractor={(item) => item.character}
         contentContainerStyle={styles.list}
-        renderItem={({ item, index }) => <StageRow stage={item} order={index + 1} />}
+        renderItem={({ item, index }) => (
+          <StageRow stage={item} order={index + 1} progress={progress.get(item.character)} />
+        )}
       />
     </ThemedView>
   );
 }
 
-function StageRow({ stage, order }: { stage: Kanji; order: number }) {
+function StageRow({
+  stage,
+  order,
+  progress,
+}: {
+  stage: Kanji;
+  order: number;
+  progress?: KanjiProgress;
+}) {
+  const now = Date.now();
+  const isDue = progress !== undefined && progress.nextReviewAt <= now;
+  const isCleared = progress !== undefined;
   return (
     <Link href={`/stage/${stage.character}`} asChild>
       <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
@@ -72,6 +102,14 @@ function StageRow({ stage, order }: { stage: Kanji; order: number }) {
             {stage.meaningsEn.slice(0, 3).join(', ') || '—'}
           </ThemedText>
           <ThemedText style={styles.meta}>{stage.strokeCount} strokes</ThemedText>
+        </View>
+        <View style={styles.badges}>
+          {isDue && (
+            <View style={styles.dueBadge}>
+              <ThemedText style={styles.dueBadgeText}>Due</ThemedText>
+            </View>
+          )}
+          {isCleared && <ThemedText style={styles.checkMark}>✓</ThemedText>}
         </View>
         <ThemedText style={styles.chevron}>›</ThemedText>
       </Pressable>
@@ -131,6 +169,26 @@ const styles = StyleSheet.create({
   meta: {
     opacity: 0.7,
     fontSize: 13,
+  },
+  badges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#c66',
+  },
+  dueBadgeText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  checkMark: {
+    fontSize: 20,
+    color: '#3a9d3a',
   },
   chevron: {
     fontSize: 26,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +14,12 @@ interface BuildSectionProps {
   targetCharacter: string;
   correctRadicals: RadicalDecomposition[];
   distractorChars: string[];
+  /**
+   * Fires the first time the user reaches the solved state in the current
+   * mount / target. Subsequent re-solves in the same session do not refire.
+   * Used by the stage detail screen to advance SRS once per visit.
+   */
+  onFirstSolve?: () => void;
 }
 
 /**
@@ -30,6 +36,7 @@ export function BuildSection({
   targetCharacter,
   correctRadicals,
   distractorChars,
+  onFirstSolve,
 }: BuildSectionProps) {
   const allChips = useMemo(() => {
     const chips: BuildChip[] = [];
@@ -46,23 +53,16 @@ export function BuildSection({
 
   const [poolOrder, setPoolOrder] = useState<string[]>(() => shuffleIds(allChips));
   const [placedIds, setPlacedIds] = useState<string[]>([]);
+  const firstSolveFiredRef = useRef(false);
 
-  // If the target kanji changes (e.g. navigating to another stage), reset.
+  // If the target kanji changes (e.g. navigating to another stage), reset
+  // game state AND the "first solve fired" guard so the next stage can fire
+  // onFirstSolve cleanly.
   useEffect(() => {
     setPoolOrder(shuffleIds(allChips));
     setPlacedIds([]);
+    firstSolveFiredRef.current = false;
   }, [allChips]);
-
-  if (correctRadicals.length === 0) {
-    return (
-      <View style={styles.section}>
-        <ThemedText type="subtitle" style={styles.heading}>
-          Build (組み立て)
-        </ThemedText>
-        <ThemedText>This kanji has no KRADFILE decomposition to build from.</ThemedText>
-      </View>
-    );
-  }
 
   const placedSet = new Set(placedIds);
   const placedChips = placedIds
@@ -73,7 +73,26 @@ export function BuildSection({
     .map((id) => allChips.find((c) => c.id === id))
     .filter((c): c is BuildChip => c !== undefined);
 
-  const solved = isSolved(correctRadicals, placedChips);
+  const hasBuild = correctRadicals.length > 0;
+  const solved = hasBuild && isSolved(correctRadicals, placedChips);
+
+  useEffect(() => {
+    if (solved && !firstSolveFiredRef.current) {
+      firstSolveFiredRef.current = true;
+      onFirstSolve?.();
+    }
+  }, [solved, onFirstSolve]);
+
+  if (!hasBuild) {
+    return (
+      <View style={styles.section}>
+        <ThemedText type="subtitle" style={styles.heading}>
+          Build (組み立て)
+        </ThemedText>
+        <ThemedText>This kanji has no KRADFILE decomposition to build from.</ThemedText>
+      </View>
+    );
+  }
 
   const add = (chipId: string) => {
     if (placedSet.has(chipId)) return;
