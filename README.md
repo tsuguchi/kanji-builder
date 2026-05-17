@@ -10,13 +10,13 @@ then combine kanji to build words. Cross-platform mobile app built with Expo
 
 Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
 mapping) and the Expo (React Native + TypeScript) app shell are in place.
-The app now boots into an **N5 stage selection list**, and tapping a row
-opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
-readings, stroke count, and KRADFILE radical decomposition. The Expo Router
-template tabs/modal demo and its components have been removed.
-
-Real gameplay (drag radicals → form kanji → score combos, plus SRS-driven
-review scheduling) is the next milestone — see `feat/radical-building-mechanic`.
+The app boots into an **N5 stage selection list**, and tapping a row opens a
+**stage detail screen** showing the kanji glyph, meanings, on/kun readings,
+stroke count, KRADFILE radical decomposition, and a **tap-select build
+mini-game**: tap chips from an available pool (correct radicals + 3
+distractors) into a build zone, and the game declares the kanji "correct"
+when the placed multiset matches the target. Drag-and-drop input and
+SRS-driven review scheduling are still future work.
 
 ## Getting started
 
