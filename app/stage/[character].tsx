@@ -7,7 +7,7 @@ import { BuildSection } from '@/components/game/build-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useProgressDb } from '@/db/progress-context';
-import { getProgressFor, recordCorrect } from '@/db/progress-queries';
+import { getProgressFor, recordSolve } from '@/db/progress-queries';
 import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
 import { getDistractorRadicals, getKanjiByCharacter, getRadicalsForKanji } from '@/db/queries';
 import type { Kanji, RadicalDecomposition } from '@/db/types';
@@ -61,9 +61,9 @@ export default function StageDetailScreen() {
     };
   }, [db, progressDb, character]);
 
-  const handleFirstSolve = () => {
+  const handleFirstSolve = (result: { hadMistake: boolean }) => {
     if (!character) return;
-    recordCorrect(progressDb, character)
+    recordSolve(progressDb, character, result)
       .then(setProgress)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };

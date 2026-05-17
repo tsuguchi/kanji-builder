@@ -22,8 +22,13 @@ pool (correct radicals + 3 distractors) into a build zone, and the game
 declares the kanji "correct" when the placed multiset matches the target.
 Each first solve in a detail-screen visit advances a WaniKani-inspired
 8-stage SRS stored in a separate writable `progress.sqlite` (4h → 8h → 1d
-→ 2d → 1w → 2w → 1mo → 4mo intervals). Drag-and-drop input and mistake
-handling are still future work.
+→ 2d → 1w → 2w → 1mo → 4mo intervals). A **clean solve** (no distractor
+ever placed during the attempt) advances the stage by 1; a **solve with at
+least one distractor placed** drops the stage by 1 (floored at 1, no
+penalty on first introduction). The success banner is green for clean
+solves and orange for solves-with-mistake. Pressing Reset starts a fresh
+attempt and clears the mistake flag. Drag-and-drop input is still future
+work.
 
 ## Getting started
 
