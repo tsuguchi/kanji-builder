@@ -18,8 +18,11 @@ interface BuildSectionProps {
    * Fires the first time the user reaches the solved state in the current
    * mount / target. Subsequent re-solves in the same session do not refire.
    * Used by the stage detail screen to advance SRS once per visit.
+   *
+   * `hadMistake` is true if at least one distractor was placed in the build
+   * zone during the current attempt (cleared by Reset and by target change).
    */
-  onFirstSolve?: () => void;
+  onFirstSolve?: (result: { hadMistake: boolean }) => void;
 }
 
 /**
@@ -53,14 +56,17 @@ export function BuildSection({
 
   const [poolOrder, setPoolOrder] = useState<string[]>(() => shuffleIds(allChips));
   const [placedIds, setPlacedIds] = useState<string[]>([]);
+  const [hadMistake, setHadMistake] = useState(false);
   const firstSolveFiredRef = useRef(false);
 
   // If the target kanji changes (e.g. navigating to another stage), reset
   // game state AND the "first solve fired" guard so the next stage can fire
-  // onFirstSolve cleanly.
+  // onFirstSolve cleanly. Mistake flag also resets — a fresh stage starts
+  // a fresh attempt.
   useEffect(() => {
     setPoolOrder(shuffleIds(allChips));
     setPlacedIds([]);
+    setHadMistake(false);
     firstSolveFiredRef.current = false;
   }, [allChips]);
 
@@ -79,9 +85,9 @@ export function BuildSection({
   useEffect(() => {
     if (solved && !firstSolveFiredRef.current) {
       firstSolveFiredRef.current = true;
-      onFirstSolve?.();
+      onFirstSolve?.({ hadMistake });
     }
-  }, [solved, onFirstSolve]);
+  }, [solved, hadMistake, onFirstSolve]);
 
   if (!hasBuild) {
     return (
@@ -97,6 +103,10 @@ export function BuildSection({
   const add = (chipId: string) => {
     if (placedSet.has(chipId)) return;
     setPlacedIds((prev) => [...prev, chipId]);
+    const chip = allChips.find((c) => c.id === chipId);
+    if (chip && !chip.isCorrect) {
+      setHadMistake(true);
+    }
   };
   const remove = (chipId: string) => {
     setPlacedIds((prev) => prev.filter((id) => id !== chipId));
@@ -104,6 +114,9 @@ export function BuildSection({
   const reset = () => {
     setPoolOrder(shuffleIds(allChips));
     setPlacedIds([]);
+    // Explicit "give me a fresh attempt" — clears the mistake flag so a
+    // clean composition after reset can still earn a full clean solve.
+    setHadMistake(false);
   };
 
   return (
@@ -115,7 +128,13 @@ export function BuildSection({
         Target: <ThemedText style={styles.targetGlyph}>{targetCharacter}</ThemedText>
       </ThemedText>
 
-      <View style={[styles.zone, solved && styles.zoneSolved]}>
+      <View
+        style={[
+          styles.zone,
+          solved && !hadMistake && styles.zoneSolvedClean,
+          solved && hadMistake && styles.zoneSolvedWithMistake,
+        ]}
+      >
         {placedChips.length === 0 ? (
           <ThemedText style={styles.zoneHint}>(tap radicals below to add)</ThemedText>
         ) : (
@@ -125,9 +144,14 @@ export function BuildSection({
             ))}
           </View>
         )}
-        {solved && (
-          <ThemedText type="defaultSemiBold" style={styles.solvedBanner}>
+        {solved && !hadMistake && (
+          <ThemedText type="defaultSemiBold" style={styles.solvedBannerClean}>
             ✓ Correct!
+          </ThemedText>
+        )}
+        {solved && hadMistake && (
+          <ThemedText type="defaultSemiBold" style={styles.solvedBannerMistake}>
+            ✓ Solved (with mistake)
           </ThemedText>
         )}
       </View>
@@ -227,16 +251,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  zoneSolved: {
+  zoneSolvedClean: {
     borderColor: '#3a9d3a',
     backgroundColor: '#3a9d3a14',
+  },
+  zoneSolvedWithMistake: {
+    borderColor: '#d18a2a',
+    backgroundColor: '#d18a2a14',
   },
   zoneHint: {
     opacity: 0.4,
     fontSize: 13,
   },
-  solvedBanner: {
+  solvedBannerClean: {
     color: '#3a9d3a',
+    fontSize: 16,
+  },
+  solvedBannerMistake: {
+    color: '#d18a2a',
     fontSize: 16,
   },
   poolLabel: {
