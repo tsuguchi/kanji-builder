@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { ProgressDbProvider } from '@/db/progress-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const DB_NAME = 'kanji.sqlite';
@@ -28,13 +29,15 @@ export default function RootLayout() {
   return (
     <Suspense fallback={<LoadingFallback />}>
       <SQLiteProvider databaseName={DB_NAME} assetSource={{ assetId: DB_ASSET }} useSuspense>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="stage/[character]" options={{ title: '' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <ProgressDbProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="stage/[character]" options={{ title: '' }} />
+            </Stack>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </ProgressDbProvider>
       </SQLiteProvider>
     </Suspense>
   );

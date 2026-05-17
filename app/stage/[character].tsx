@@ -6,6 +6,9 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { BuildSection } from '@/components/game/build-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useProgressDb } from '@/db/progress-context';
+import { getProgressFor, recordCorrect } from '@/db/progress-queries';
+import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
 import { getDistractorRadicals, getKanjiByCharacter, getRadicalsForKanji } from '@/db/queries';
 import type { Kanji, RadicalDecomposition } from '@/db/types';
 
@@ -20,7 +23,9 @@ interface StageData {
 export default function StageDetailScreen() {
   const { character } = useLocalSearchParams<{ character: string }>();
   const db = useSQLiteContext();
+  const progressDb = useProgressDb();
   const [data, setData] = useState<StageData | null>(null);
+  const [progress, setProgress] = useState<KanjiProgress | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +47,11 @@ export default function StageDetailScreen() {
           radicals.map((r) => r.radicalChar),
           DISTRACTOR_COUNT,
         );
-        if (!cancelled) setData({ kanji, radicals, distractors });
+        const existingProgress = await getProgressFor(progressDb, character);
+        if (!cancelled) {
+          setData({ kanji, radicals, distractors });
+          setProgress(existingProgress);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       }
@@ -50,7 +59,14 @@ export default function StageDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [db, character]);
+  }, [db, progressDb, character]);
+
+  const handleFirstSolve = () => {
+    if (!character) return;
+    recordCorrect(progressDb, character)
+      .then(setProgress)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
 
   if (error) {
     return (
@@ -126,14 +142,48 @@ export default function StageDetailScreen() {
           )}
         </Section>
 
+        <Section title="Progress">
+          {progress ? (
+            <ProgressSummary progress={progress} />
+          ) : (
+            <ThemedText style={styles.notCleared}>Not cleared yet.</ThemedText>
+          )}
+        </Section>
+
         <BuildSection
           targetCharacter={kanji.character}
           correctRadicals={radicals}
           distractorChars={distractors}
+          onFirstSolve={handleFirstSolve}
         />
       </ScrollView>
     </ThemedView>
   );
+}
+
+function ProgressSummary({ progress }: { progress: KanjiProgress }) {
+  const now = Date.now();
+  const isDue = progress.nextReviewAt <= now;
+  const dueIn = formatRelative(progress.nextReviewAt - now);
+  return (
+    <View style={styles.progressBox}>
+      <ThemedText type="defaultSemiBold" style={styles.progressStage}>
+        {SRS_STAGE_LABELS[progress.srsStage]} (stage {progress.srsStage}/8)
+      </ThemedText>
+      <ThemedText style={styles.progressMeta}>
+        {isDue ? `Review due (was scheduled ${dueIn})` : `Next review in ${dueIn}`}
+      </ThemedText>
+    </View>
+  );
+}
+
+function formatRelative(deltaMs: number): string {
+  const abs = Math.abs(deltaMs);
+  const hour = 60 * 60 * 1000;
+  const day = 24 * hour;
+  if (abs < hour) return `${Math.max(1, Math.round(abs / (60 * 1000)))}m`;
+  if (abs < day) return `${Math.round(abs / hour)}h`;
+  return `${Math.round(abs / day)}d`;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -183,6 +233,19 @@ const styles = StyleSheet.create({
   heroMeaning: {
     fontSize: 18,
     textAlign: 'center',
+  },
+  notCleared: {
+    opacity: 0.5,
+  },
+  progressBox: {
+    gap: 4,
+  },
+  progressStage: {
+    fontSize: 16,
+  },
+  progressMeta: {
+    opacity: 0.6,
+    fontSize: 13,
   },
   heroMeta: {
     opacity: 0.6,
