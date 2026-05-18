@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  measure,
+  runOnJS,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  type AnimatedRef,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import type { RadicalDecomposition } from '@/db/types';
@@ -26,14 +36,19 @@ interface BuildSectionProps {
 }
 
 /**
- * Tap-select radical-building mini-game. The user taps chips from the
- * Available pool to move them into the Build zone, and tapping a chip in the
- * Build zone returns it to the pool. Win is declared when the multiset of
- * placed radicals matches the target's KRADFILE decomposition.
+ * Drag-and-drop radical-building mini-game. Chips are draggable from the
+ * Available pool into the Build zone (and back). A short tap on a chip also
+ * still works as a single-touch toggle for accessibility / one-handed use —
+ * Pan needs ~10 px of movement to activate, so a true tap falls through to
+ * the Tap gesture.
  *
- * Stateless wrt routing — owns only ephemeral game state (which chips are
- * placed). SRS / progress persistence is intentionally out of scope here and
- * lives in a separate feature.
+ * Win is declared when the multiset of placed radicals matches the target's
+ * KRADFILE decomposition. The `hadMistake` flag fires `onFirstSolve` with
+ * `true` if any distractor was placed during this attempt; Reset clears the
+ * flag for a clean retry.
+ *
+ * Stateless wrt routing — owns only ephemeral game state. SRS / progress
+ * persistence lives in the parent stage detail screen.
  */
 export function BuildSection({
   targetCharacter,
@@ -58,6 +73,7 @@ export function BuildSection({
   const [placedIds, setPlacedIds] = useState<string[]>([]);
   const [hadMistake, setHadMistake] = useState(false);
   const firstSolveFiredRef = useRef(false);
+  const buildZoneRef = useAnimatedRef<Animated.View>();
 
   // If the target kanji changes (e.g. navigating to another stage), reset
   // game state AND the "first solve fired" guard so the next stage can fire
@@ -89,6 +105,32 @@ export function BuildSection({
     }
   }, [solved, hadMistake, onFirstSolve]);
 
+  const moveToBuild = (chipId: string) => {
+    if (placedSet.has(chipId)) return;
+    setPlacedIds((prev) => [...prev, chipId]);
+    const chip = allChips.find((c) => c.id === chipId);
+    if (chip && !chip.isCorrect) {
+      setHadMistake(true);
+    }
+  };
+  const moveToPool = (chipId: string) => {
+    setPlacedIds((prev) => prev.filter((id) => id !== chipId));
+  };
+  const toggle = (chipId: string) => {
+    if (placedSet.has(chipId)) {
+      moveToPool(chipId);
+    } else {
+      moveToBuild(chipId);
+    }
+  };
+  const reset = () => {
+    setPoolOrder(shuffleIds(allChips));
+    setPlacedIds([]);
+    // Explicit "give me a fresh attempt" — clears the mistake flag so a
+    // clean composition after reset can still earn a full clean solve.
+    setHadMistake(false);
+  };
+
   if (!hasBuild) {
     return (
       <View style={styles.section}>
@@ -100,25 +142,6 @@ export function BuildSection({
     );
   }
 
-  const add = (chipId: string) => {
-    if (placedSet.has(chipId)) return;
-    setPlacedIds((prev) => [...prev, chipId]);
-    const chip = allChips.find((c) => c.id === chipId);
-    if (chip && !chip.isCorrect) {
-      setHadMistake(true);
-    }
-  };
-  const remove = (chipId: string) => {
-    setPlacedIds((prev) => prev.filter((id) => id !== chipId));
-  };
-  const reset = () => {
-    setPoolOrder(shuffleIds(allChips));
-    setPlacedIds([]);
-    // Explicit "give me a fresh attempt" — clears the mistake flag so a
-    // clean composition after reset can still earn a full clean solve.
-    setHadMistake(false);
-  };
-
   return (
     <View style={styles.section}>
       <ThemedText type="subtitle" style={styles.heading}>
@@ -128,7 +151,8 @@ export function BuildSection({
         Target: <ThemedText style={styles.targetGlyph}>{targetCharacter}</ThemedText>
       </ThemedText>
 
-      <View
+      <Animated.View
+        ref={buildZoneRef}
         style={[
           styles.zone,
           solved && !hadMistake && styles.zoneSolvedClean,
@@ -136,11 +160,19 @@ export function BuildSection({
         ]}
       >
         {placedChips.length === 0 ? (
-          <ThemedText style={styles.zoneHint}>(tap radicals below to add)</ThemedText>
+          <ThemedText style={styles.zoneHint}>(drag or tap radicals below)</ThemedText>
         ) : (
           <View style={styles.chipRow}>
             {placedChips.map((chip) => (
-              <Chip key={chip.id} chip={chip} placed onPress={() => remove(chip.id)} />
+              <DraggableChip
+                key={chip.id}
+                chip={chip}
+                isPlaced
+                buildZoneRef={buildZoneRef}
+                onMoveToBuild={() => moveToBuild(chip.id)}
+                onMoveToPool={() => moveToPool(chip.id)}
+                onTap={() => toggle(chip.id)}
+              />
             ))}
           </View>
         )}
@@ -154,7 +186,7 @@ export function BuildSection({
             ✓ Solved (with mistake)
           </ThemedText>
         )}
-      </View>
+      </Animated.View>
 
       <ThemedText style={styles.poolLabel}>Available radicals</ThemedText>
       <View style={styles.chipRow}>
@@ -162,7 +194,15 @@ export function BuildSection({
           <ThemedText style={styles.zoneHint}>(all radicals placed)</ThemedText>
         ) : (
           poolChips.map((chip) => (
-            <Chip key={chip.id} chip={chip} placed={false} onPress={() => add(chip.id)} />
+            <DraggableChip
+              key={chip.id}
+              chip={chip}
+              isPlaced={false}
+              buildZoneRef={buildZoneRef}
+              onMoveToBuild={() => moveToBuild(chip.id)}
+              onMoveToPool={() => moveToPool(chip.id)}
+              onTap={() => toggle(chip.id)}
+            />
           ))
         )}
       </View>
@@ -177,26 +217,83 @@ export function BuildSection({
   );
 }
 
-function Chip({
-  chip,
-  placed,
-  onPress,
-}: {
+interface DraggableChipProps {
   chip: BuildChip;
-  placed: boolean;
-  onPress: () => void;
-}) {
+  isPlaced: boolean;
+  buildZoneRef: AnimatedRef<Animated.View>;
+  onMoveToBuild: () => void;
+  onMoveToPool: () => void;
+  onTap: () => void;
+}
+
+function DraggableChip({
+  chip,
+  isPlaced,
+  buildZoneRef,
+  onMoveToBuild,
+  onMoveToPool,
+  onTap,
+}: DraggableChipProps) {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const dragging = useSharedValue(false);
+
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      dragging.value = true;
+      scale.value = withSpring(1.2);
+    })
+    .onChange((e) => {
+      translateX.value = e.translationX;
+      translateY.value = e.translationY;
+    })
+    .onEnd((e) => {
+      const measured = measure(buildZoneRef);
+      let inBuildZone = false;
+      if (measured) {
+        inBuildZone =
+          e.absoluteX >= measured.pageX &&
+          e.absoluteX <= measured.pageX + measured.width &&
+          e.absoluteY >= measured.pageY &&
+          e.absoluteY <= measured.pageY + measured.height;
+      }
+      if (inBuildZone && !isPlaced) {
+        runOnJS(onMoveToBuild)();
+      } else if (!inBuildZone && isPlaced) {
+        runOnJS(onMoveToPool)();
+      }
+      translateX.value = withSpring(0);
+      translateY.value = withSpring(0);
+      scale.value = withSpring(1);
+      dragging.value = false;
+    });
+
+  // Tap remains available so a quick single touch (no drag movement) toggles
+  // the chip between zones — preserving the previous tap-select UX for
+  // accessibility / single-handed use.
+  const tap = Gesture.Tap().onEnd(() => {
+    runOnJS(onTap)();
+  });
+
+  const combined = Gesture.Race(tap, pan);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    zIndex: dragging.value ? 100 : 1,
+    elevation: dragging.value ? 8 : 0,
+  }));
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        placed && styles.chipPlaced,
-        pressed && styles.chipPressed,
-      ]}
-    >
-      <ThemedText style={styles.chipGlyph}>{chip.char}</ThemedText>
-    </Pressable>
+    <GestureDetector gesture={combined}>
+      <Animated.View style={[styles.chip, isPlaced && styles.chipPlaced, animatedStyle]}>
+        <ThemedText style={styles.chipGlyph}>{chip.char}</ThemedText>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -242,7 +339,7 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   zone: {
-    minHeight: 72,
+    minHeight: 96,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#8886',
@@ -250,6 +347,7 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   zoneSolvedClean: {
     borderColor: '#3a9d3a',
@@ -290,12 +388,10 @@ const styles = StyleSheet.create({
     borderColor: '#8886',
     minWidth: 48,
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   chipPlaced: {
     backgroundColor: '#8881',
-  },
-  chipPressed: {
-    opacity: 0.5,
   },
   chipGlyph: {
     fontSize: 26,
