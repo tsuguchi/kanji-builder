@@ -108,6 +108,12 @@ data/bundle/
 *.sqlite-shm
 *.sqlite-wal
 
+# EXCEPTION: the Metro-bundled copy of the kanji database is committed so
+# EAS Build (which runs in a clean environment without Python + the raw
+# KANJIDIC2/KRADFILE sources) can find the asset at build time. Local dev
+# still regenerates it from `data/bundle/kanji.sqlite` via `npm run prepare-db`.
+!assets/data/kanji.sqlite
+
 # KanjiVG SVGs (downloaded by pipeline)
 data/strokes/
 strokes/*.svg
