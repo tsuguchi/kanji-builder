@@ -17,9 +17,12 @@ screen** listing only the currently-overdue kanji (sorted most-overdue
 first, empty state shows the next upcoming review time). Tapping any row
 opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
 readings, stroke count, KRADFILE radical decomposition, an SRS progress
-summary, and a **tap-select build mini-game**: tap chips from an available
-pool (correct radicals + 3 distractors) into a build zone, and the game
-declares the kanji "correct" when the placed multiset matches the target.
+summary, and a **drag-and-drop build mini-game**: drag chips from an
+available pool (correct radicals + 3 distractors) into a build zone — a
+short tap still works as a fallback for accessibility / single-handed use,
+since the Pan gesture needs ~10 px of movement to win over Tap in a
+`Gesture.Race`. The game declares the kanji "correct" when the placed
+multiset matches the target.
 Each first solve in a detail-screen visit advances a WaniKani-inspired
 8-stage SRS stored in a separate writable `progress.sqlite` (4h → 8h → 1d
 → 2d → 1w → 2w → 1mo → 4mo intervals). A **clean solve** (no distractor
@@ -32,7 +35,7 @@ still **due for review** the detail screen surfaces a green "Next due: X
 →" button that navigates (via Stack `replace`, so back-navigation still
 returns to Reviews or Stages, not through every previously-visited stage)
 straight to the next overdue kanji — enabling a quick "session loop"
-through the review queue. Drag-and-drop input is still future work.
+through the review queue.
 
 ## Getting started
 
