@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "io.github.tsuguchi.kanjibuilder",
       "supportsTablet": true
     },
     "android": {
+      "package": "io.github.tsuguchi.kanjibuilder",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

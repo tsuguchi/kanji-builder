@@ -84,6 +84,69 @@ The data layer is a thin wrapper over `expo-sqlite`:
 - [`app/_layout.tsx`](app/_layout.tsx) — wraps the app in `<SQLiteProvider>`,
   loading the bundled asset via `assetSource={{ assetId: require(...) }}`.
 
+## Building for store distribution (EAS Build)
+
+`npx expo start` is sufficient for development against Expo Go, but iOS
+.ipa and Android .aab artifacts (TestFlight / Play Store) are produced by
+**EAS Build** (Expo's cloud build service). The Mac requirement for iOS
+signing is offloaded to EAS's macOS runners, so the entire workflow stays
+Windows-friendly.
+
+Profiles are defined in [eas.json](eas.json):
+
+| Profile       | Distribution | Android format                     | Use case                           |
+| ------------- | ------------ | ---------------------------------- | ---------------------------------- |
+| `development` | internal     | `.apk` (dev client)                | Native modules not in Expo Go      |
+| `preview`     | internal     | `.apk`                             | Share with testers via direct link |
+| `production`  | store        | `.aab` (Play) / `.ipa` (App Store) | Ship to TestFlight / Play          |
+
+```bash
+# One-time setup (per developer machine)
+npm install -g eas-cli          # or use `npx eas-cli` per-invocation
+npx eas login                   # Expo account (free)
+npx eas init                    # creates an Expo project, writes projectId into app.json
+
+# Run a build (cloud)
+npx eas build --profile preview  --platform android   # → APK link to share
+npx eas build --profile preview  --platform ios       # → ad-hoc IPA
+npx eas build --profile production --platform all     # → store-ready bundles
+
+# Submit to stores (after a production build completes)
+npx eas submit --profile production --platform ios    # → TestFlight
+npx eas submit --profile production --platform android # → Play Console
+```
+
+### Prerequisites for actual store submission
+
+- **iOS**: Apple Developer Program membership (USD 99/year). `eas submit
+--platform ios` will prompt for an Apple ID / app-specific password and
+  the team ID; EAS handles certificate and provisioning profile generation
+  if not already present.
+- **Android**: Google Play Console one-time fee (USD 25). `eas submit
+--platform android` requires a service account JSON for the Play API.
+
+### Known limitation: bundled SQLite in EAS
+
+The `prepare-db` script runs from a `prestart` npm hook and copies
+`data/bundle/kanji.sqlite` (Python pipeline output, gitignored) into
+`assets/data/kanji.sqlite` (also gitignored). EAS Build runs in a clean
+environment where **neither file exists**, so the asset bundling step
+fails. Options to resolve before the first cloud build:
+
+1. Track `assets/data/kanji.sqlite` in git as a build-time prebuilt
+   artifact (~4 MB; would require a `!assets/data/*.sqlite` rule in
+   `.gitignore`).
+2. Add an `eas-build-pre-install` hook that runs the Python pipeline,
+   provided the EAS macOS/Linux runners have Python 3 available (they
+   do as of 2026) and we vendor the raw KANJIDIC2 / KRADFILE sources OR
+   fetch them at build time.
+3. Use [EAS file-based env vars](https://docs.expo.dev/eas/environment-variables/file-environment-variables/)
+   to upload the prebuilt SQLite as a secret and copy it into place from
+   the hook.
+
+Tracked separately — pick the path in a follow-up PR before the first
+production build.
+
 ## Concept
 
 - **Audience**: Non-Japanese learners of Japanese (JLPT N5 → N1).
