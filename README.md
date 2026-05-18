@@ -40,14 +40,7 @@ through the review queue.
 ## Getting started
 
 ```bash
-# 1. Generate the bundled SQLite (one-time, after a fresh clone)
-python scripts/01_download_sources.py
-python scripts/02_parse_kanjidic.py
-python scripts/03_parse_kradfile.py
-python scripts/04_apply_jlpt_new.py
-# → data/bundle/kanji.sqlite
-
-# 2. Install JS dependencies and start the Expo dev server
+# Install JS dependencies and start the Expo dev server
 npm install
 npm run start          # opens the Expo CLI; press a / i / w to launch
 npm run android        # launch directly on an Android emulator / device
@@ -55,11 +48,26 @@ npm run ios            # launch on an iOS simulator (requires macOS)
 npm run web            # run in a browser
 ```
 
+The bundled kanji database (`assets/data/kanji.sqlite`, ~4 MB) is **tracked
+in git** as a build-time prebuilt artifact so a fresh clone is immediately
+runnable — no Python pipeline needed up front. The Python pipeline below
+is only needed when you change the schema and want to regenerate the
+bundle from raw KANJIDIC2 / KRADFILE / kanji-data:
+
+```bash
+python scripts/01_download_sources.py
+python scripts/02_parse_kanjidic.py
+python scripts/03_parse_kradfile.py
+python scripts/04_apply_jlpt_new.py
+# → data/bundle/kanji.sqlite (gitignored)
+npm run prepare-db
+# → copies data/bundle/kanji.sqlite to assets/data/kanji.sqlite (tracked)
+```
+
 `npm run start` (and the platform-specific variants) automatically runs
-`npm run prepare-db` first, which copies `data/bundle/kanji.sqlite` into
-`assets/data/kanji.sqlite` so Metro bundles it with the app. If you invoke
-`npx expo start` directly instead, run `npm run prepare-db` manually first
-— Metro will fail to resolve the asset otherwise.
+`prepare-db` first as a `prestart` hook. The script is idempotent: on a
+fresh clone it skips the copy because there is no source bundle, and the
+committed `assets/data/kanji.sqlite` is used as-is.
 
 Quality gates (run before opening a PR):
 
@@ -125,27 +133,26 @@ npx eas submit --profile production --platform android # → Play Console
 - **Android**: Google Play Console one-time fee (USD 25). `eas submit
 --platform android` requires a service account JSON for the Play API.
 
-### Known limitation: bundled SQLite in EAS
+### Bundled SQLite in EAS
 
-The `prepare-db` script runs from a `prestart` npm hook and copies
-`data/bundle/kanji.sqlite` (Python pipeline output, gitignored) into
-`assets/data/kanji.sqlite` (also gitignored). EAS Build runs in a clean
-environment where **neither file exists**, so the asset bundling step
-fails. Options to resolve before the first cloud build:
+`assets/data/kanji.sqlite` (~4 MB) is **tracked in git** so EAS Build, which
+runs in a clean environment without Python or the raw KANJIDIC2 / KRADFILE
+sources, finds the asset and bundles it normally. Local dev still
+regenerates the file from `data/bundle/kanji.sqlite` via `npm run
+prepare-db` whenever the Python pipeline outputs a fresh bundle (e.g. on a
+schema change); commit the resulting `assets/data/kanji.sqlite` diff
+alongside the schema change so EAS picks it up on the next cloud build.
 
-1. Track `assets/data/kanji.sqlite` in git as a build-time prebuilt
-   artifact (~4 MB; would require a `!assets/data/*.sqlite` rule in
-   `.gitignore`).
-2. Add an `eas-build-pre-install` hook that runs the Python pipeline,
-   provided the EAS macOS/Linux runners have Python 3 available (they
-   do as of 2026) and we vendor the raw KANJIDIC2 / KRADFILE sources OR
-   fetch them at build time.
-3. Use [EAS file-based env vars](https://docs.expo.dev/eas/environment-variables/file-environment-variables/)
-   to upload the prebuilt SQLite as a secret and copy it into place from
-   the hook.
+Alternatives that were rejected for the personal MVP stage (in case the
+trade-off becomes interesting later):
 
-Tracked separately — pick the path in a follow-up PR before the first
-production build.
+- **EAS `pre-install` hook running the Python pipeline** — keeps the
+  repository binary-free, but requires vendoring or fetching raw
+  KANJIDIC2 / KRADFILE during each cloud build and adds 30-60 s per
+  build for the regeneration.
+- **[EAS file-based env vars](https://docs.expo.dev/eas/environment-variables/file-environment-variables/)
+  uploading the prebuilt SQLite as a secret** — keeps it out of git, but
+  shifts manual upload duty to each developer / each schema change.
 
 ## Concept
 
