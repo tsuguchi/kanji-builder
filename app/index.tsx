@@ -69,17 +69,22 @@ export default function StageSelectionScreen() {
         <ThemedText type="subtitle">
           {clearedCount}/{stages.length} cleared
         </ThemedText>
-        {dueCount > 0 && (
-          <Link href="/reviews" asChild>
-            <Pressable
-              style={({ pressed }) => [styles.reviewsCta, pressed && styles.reviewsCtaPressed]}
+        <Link href="/reviews" asChild>
+          <Pressable
+            style={({ pressed }) => [
+              styles.reviewsCta,
+              dueCount > 0 ? styles.reviewsCtaDue : styles.reviewsCtaIdle,
+              pressed && styles.reviewsCtaPressed,
+            ]}
+          >
+            <ThemedText
+              type="defaultSemiBold"
+              style={dueCount > 0 ? styles.reviewsCtaTextDue : styles.reviewsCtaTextIdle}
             >
-              <ThemedText type="defaultSemiBold" style={styles.reviewsCtaText}>
-                {dueCount} review{dueCount > 1 ? 's' : ''} due →
-              </ThemedText>
-            </Pressable>
-          </Link>
-        )}
+              {dueCount > 0 ? `${dueCount} review${dueCount > 1 ? 's' : ''} due →` : 'Reviews →'}
+            </ThemedText>
+          </Pressable>
+        </Link>
       </View>
       <FlatList
         data={stages}
@@ -152,15 +157,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#c66',
     alignSelf: 'flex-start',
+  },
+  reviewsCtaDue: {
+    backgroundColor: '#c66',
+  },
+  reviewsCtaIdle: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#8886',
+    backgroundColor: 'transparent',
   },
   reviewsCtaPressed: {
     opacity: 0.6,
   },
-  reviewsCtaText: {
+  reviewsCtaTextDue: {
     color: '#fff',
     fontSize: 14,
+  },
+  reviewsCtaTextIdle: {
+    fontSize: 14,
+    opacity: 0.7,
   },
   list: {
     paddingHorizontal: 16,
