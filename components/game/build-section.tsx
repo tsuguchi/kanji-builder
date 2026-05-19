@@ -95,6 +95,16 @@ export function BuildSection({
     .map((id) => allChips.find((c) => c.id === id))
     .filter((c): c is BuildChip => c !== undefined);
 
+  // One slot per radical occurrence in the target multiset (e.g. 林 needs
+  // 2 slots for 木×2). Slots are filled in placement order; emptying a
+  // middle slot does not collapse the row, so chips keep a stable visual
+  // position once placed.
+  const slotCount = correctRadicals.reduce((sum, r) => sum + r.count, 0);
+  const slots: (BuildChip | null)[] = Array.from(
+    { length: slotCount },
+    (_, i) => placedChips[i] ?? null,
+  );
+
   const hasBuild = correctRadicals.length > 0;
   const solved = hasBuild && isSolved(correctRadicals, placedChips);
 
@@ -159,23 +169,24 @@ export function BuildSection({
           solved && hadMistake && styles.zoneSolvedWithMistake,
         ]}
       >
-        {placedChips.length === 0 ? (
-          <ThemedText style={styles.zoneHint}>(drag or tap radicals below)</ThemedText>
-        ) : (
-          <View style={styles.chipRow}>
-            {placedChips.map((chip) => (
-              <DraggableChip
-                key={chip.id}
-                chip={chip}
-                isPlaced
-                buildZoneRef={buildZoneRef}
-                onMoveToBuild={() => moveToBuild(chip.id)}
-                onMoveToPool={() => moveToPool(chip.id)}
-                onTap={() => toggle(chip.id)}
-              />
-            ))}
-          </View>
-        )}
+        <View style={styles.slotRow}>
+          {slots.map((chip, slotIdx) =>
+            chip ? (
+              <View key={`slot-${slotIdx}`} style={styles.slot}>
+                <DraggableChip
+                  chip={chip}
+                  isPlaced
+                  buildZoneRef={buildZoneRef}
+                  onMoveToBuild={() => moveToBuild(chip.id)}
+                  onMoveToPool={() => moveToPool(chip.id)}
+                  onTap={() => toggle(chip.id)}
+                />
+              </View>
+            ) : (
+              <View key={`slot-${slotIdx}`} style={[styles.slot, styles.slotEmpty]} />
+            ),
+          )}
+        </View>
         {solved && !hadMistake && (
           <ThemedText type="defaultSemiBold" style={styles.solvedBannerClean}>
             ✓ Correct!
@@ -337,6 +348,26 @@ const styles = StyleSheet.create({
   targetGlyph: {
     fontSize: 28,
     lineHeight: 30,
+  },
+  slotRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  slot: {
+    width: 56,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotEmpty: {
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#8884',
+    borderStyle: 'dashed',
+    backgroundColor: '#8881',
   },
   zone: {
     minHeight: 96,

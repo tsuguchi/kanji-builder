@@ -19,12 +19,14 @@ currently-overdue kanji (sorted most-overdue first, empty state shows
 the next upcoming review time or the most recent session summary). Tapping any row
 opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
 readings, stroke count, KRADFILE radical decomposition, an SRS progress
-summary, and a **drag-and-drop build mini-game**: drag chips from an
-available pool (correct radicals + 3 distractors) into a build zone — a
-short tap still works as a fallback for accessibility / single-handed use,
-since the Pan gesture needs ~10 px of movement to win over Tap in a
-`Gesture.Race`. The game declares the kanji "correct" when the placed
-multiset matches the target.
+summary, and a **drag-and-drop build mini-game**: the build zone shows
+dashed slot placeholders matching the number of radicals needed (e.g. `林`
+shows 2 slots for 木×2), and the user drags chips from an available pool
+(correct radicals + 3 distractors) into those slots — a short tap still
+works as a fallback for accessibility / single-handed use, since the Pan
+gesture needs ~10 px of movement to win over Tap in a `Gesture.Race`. The
+game declares the kanji "correct" when the placed multiset matches the
+target.
 Each first solve in a detail-screen visit advances a WaniKani-inspired
 8-stage SRS stored in a separate writable `progress.sqlite` (4h → 8h → 1d
 → 2d → 1w → 2w → 1mo → 4mo intervals). A **clean solve** (no distractor
