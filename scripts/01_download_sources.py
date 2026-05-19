@@ -43,9 +43,9 @@ RAW_DIR = PROJECT_ROOT / "data" / "raw"
 class Source:
     name: str
     url: str
-    archive: str                          # local filename under data/raw/
+    archive: str  # local filename under data/raw/
     fmt: Literal["gzip", "zip", "plain"]  # how to handle after download
-    members: list[str]                    # gzip/plain: [output filename]; zip: [member1, ...]
+    members: list[str]  # gzip/plain: [output filename]; zip: [member1, ...]
     license: str
 
 
@@ -127,15 +127,12 @@ def extract_zip(archive: Path, members: list[str], dest_dir: Path, force: bool) 
             if dest.exists() and not force:
                 print(f"  [skip]   {dest.name} ({human_size(dest.stat().st_size)})")
                 continue
-            info = by_basename.get(want)
-            if info is None:
+            member_info = by_basename.get(want)
+            if member_info is None:
                 available = ", ".join(sorted(by_basename)) or "(empty)"
-                raise SystemExit(
-                    f"ERROR: member '{want}' not found in {archive.name}. "
-                    f"Available: {available}"
-                )
-            print(f"  [unzip]  {archive.name}!{info.filename} -> {dest.name}")
-            with z.open(info) as fi, dest.open("wb") as fo:
+                raise SystemExit(f"ERROR: member '{want}' not found in {archive.name}. Available: {available}")
+            print(f"  [unzip]  {archive.name}!{member_info.filename} -> {dest.name}")
+            with z.open(member_info) as fi, dest.open("wb") as fo:
                 shutil.copyfileobj(fi, fo)
             print(f"  [ok]     {dest.name} ({human_size(dest.stat().st_size)})")
 

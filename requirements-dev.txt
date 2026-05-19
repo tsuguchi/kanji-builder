@@ -1,0 +1,7 @@
+# Dev tooling for the Python data pipeline. Runtime deps stay in
+# requirements.txt (currently stdlib-only). Install with:
+#   pip install -r requirements-dev.txt
+
+ruff>=0.6
+mypy>=1.11
+pytest>=8.0

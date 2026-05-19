@@ -1,0 +1,49 @@
+# Tooling config for the Python data pipeline (scripts/01_..04_*).
+# Runtime code is stdlib-only; this file just configures the dev tools.
+
+[tool.ruff]
+# Match the minimum supported version declared in requirements.txt.
+target-version = "py310"
+# Pipeline scripts have wide aligned-table docstrings (KANJIDIC2 schema
+# columns, source URL listings) that we don't want to reflow. 120 gives
+# enough room for those without being lax on actual code.
+line-length = 120
+
+# Pipeline lives in scripts/; tests live in tests/.
+include = ["scripts/**/*.py", "tests/**/*.py", "pyproject.toml"]
+
+[tool.ruff.lint]
+# Pragmatic starter set: pyflakes (F), pycodestyle (E/W), pyupgrade (UP),
+# isort (I), simplify (SIM), bug-prone (B). Kept tight enough to catch real
+# issues without going crazy on cosmetic rules.
+select = ["E", "F", "W", "UP", "I", "SIM", "B"]
+ignore = [
+  # `os.path.exists()` etc. — fine in scripts, no need to nag.
+  "SIM118",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+# Existing scripts use TypedDict and Optional from typing; keep strict to
+# catch drift early. The Python tooling stage is small enough that the
+# overhead is worth it.
+warn_unused_ignores = true
+warn_return_any = true
+warn_redundant_casts = true
+# Allow untyped third-party imports if/when we add them in scripts.
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "scripts.*"
+# Scripts run as `python scripts/02_*.py`, no package imports — keep
+# permissive on missing __init__.py etc.
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+python_files = ["test_*.py"]
