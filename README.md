@@ -92,6 +92,24 @@ and every pull request. CI runs on `ubuntu-latest` with Node 20 LTS and
 skips `npm run prepare-db` — the bundled `kanji.sqlite` is a runtime asset,
 not a build-time TypeScript dependency.
 
+A second CI job covers the Python data pipeline (`scripts/01..04`):
+
+```bash
+# One-time setup
+pip install -r requirements-dev.txt
+
+# Equivalent to what CI runs
+ruff check scripts tests
+ruff format --check scripts tests
+mypy scripts tests
+pytest
+```
+
+Configuration lives in [pyproject.toml](pyproject.toml) (single source of
+truth for ruff / mypy / pytest). Tooling versions are pinned in
+[requirements-dev.txt](requirements-dev.txt); pipeline runtime stays
+stdlib-only via [requirements.txt](requirements.txt).
+
 The data layer is a thin wrapper over `expo-sqlite`:
 
 - [`db/types.ts`](db/types.ts) — TypeScript types mirroring the SQLite schema

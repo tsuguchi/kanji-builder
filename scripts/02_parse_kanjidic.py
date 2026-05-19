@@ -32,12 +32,13 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -65,16 +66,16 @@ CREATE INDEX idx_kanji_freq  ON kanji(frequency_rank);
 class KanjiRow(TypedDict):
     character: str
     stroke_count: int
-    jlpt_old: Optional[int]
-    jouyou_grade: Optional[int]
-    frequency_rank: Optional[int]
+    jlpt_old: int | None
+    jouyou_grade: int | None
+    frequency_rank: int | None
     meanings_en: str
     onyomi: str
     kunyomi: str
-    radical_classical: Optional[int]
+    radical_classical: int | None
 
 
-def _int_or_none(elem: Optional[ET.Element]) -> Optional[int]:
+def _int_or_none(elem: ET.Element | None) -> int | None:
     if elem is None or elem.text is None:
         return None
     try:
@@ -83,7 +84,7 @@ def _int_or_none(elem: Optional[ET.Element]) -> Optional[int]:
         return None
 
 
-def extract_kanji(char_elem: ET.Element) -> Optional[KanjiRow]:
+def extract_kanji(char_elem: ET.Element) -> KanjiRow | None:
     literal = char_elem.findtext("literal")
     if not literal:
         return None
@@ -108,15 +109,13 @@ def extract_kanji(char_elem: ET.Element) -> Optional[KanjiRow]:
     freq = _int_or_none(misc.find("freq"))
     jlpt = _int_or_none(misc.find("jlpt"))
 
-    radical: Optional[int] = None
+    radical: int | None = None
     radical_elem = char_elem.find("radical")
     if radical_elem is not None:
         for rv in radical_elem.findall("rad_value"):
             if rv.get("rad_type") == "classical" and rv.text:
-                try:
+                with contextlib.suppress(ValueError):
                     radical = int(rv.text)
-                except ValueError:
-                    pass
                 break
 
     onyomi: list[str] = []
@@ -156,8 +155,7 @@ def extract_kanji(char_elem: ET.Element) -> Optional[KanjiRow]:
 def main() -> int:
     if not SRC.exists():
         print(
-            f"ERROR: {SRC} not found.\n"
-            "Run scripts/01_download_sources.py first.",
+            f"ERROR: {SRC} not found.\nRun scripts/01_download_sources.py first.",
             file=sys.stderr,
         )
         return 1
@@ -199,9 +197,7 @@ def main() -> int:
         conn.commit()
 
         total = conn.execute("SELECT COUNT(*) FROM kanji").fetchone()[0]
-        jlpt_dist = conn.execute(
-            "SELECT jlpt_old, COUNT(*) FROM kanji GROUP BY jlpt_old ORDER BY jlpt_old"
-        ).fetchall()
+        jlpt_dist = conn.execute("SELECT jlpt_old, COUNT(*) FROM kanji GROUP BY jlpt_old ORDER BY jlpt_old").fetchall()
         grade_dist = conn.execute(
             "SELECT jouyou_grade, COUNT(*) FROM kanji GROUP BY jouyou_grade ORDER BY jouyou_grade"
         ).fetchall()

@@ -39,6 +39,7 @@ import sqlite3
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -59,23 +60,21 @@ def ensure_column(conn: sqlite3.Connection) -> bool:
 def main() -> int:
     if not DB_PATH.exists():
         print(
-            f"ERROR: {DB_PATH} not found.\n"
-            "Run scripts/02_parse_kanjidic.py first.",
+            f"ERROR: {DB_PATH} not found.\nRun scripts/02_parse_kanjidic.py first.",
             file=sys.stderr,
         )
         return 1
 
     if not SRC_JSON.exists():
         print(
-            f"ERROR: {SRC_JSON} not found.\n"
-            "Run scripts/01_download_sources.py (--source kanji-data).",
+            f"ERROR: {SRC_JSON} not found.\nRun scripts/01_download_sources.py (--source kanji-data).",
             file=sys.stderr,
         )
         return 1
 
     print(f"Loading {SRC_JSON.name} ({SRC_JSON.stat().st_size:,} bytes) ...")
     with SRC_JSON.open(encoding="utf-8") as f:
-        data: dict[str, dict] = json.load(f)
+        data: dict[str, dict[str, Any]] = json.load(f)
     print(f"  entries: {len(data):,}")
 
     # Build (level, char) UPDATEs only for non-null jlpt_new.
@@ -91,7 +90,7 @@ def main() -> int:
         updates.append((lvl, char))
         by_level[lvl] += 1
     print(f"  with jlpt_new: {len(updates):,} kanji")
-    print(f"  by level (src): " + ", ".join(f"N{l}={by_level[l]}" for l in sorted(by_level, reverse=True)))
+    print("  by level (src): " + ", ".join(f"N{lv}={by_level[lv]}" for lv in sorted(by_level, reverse=True)))
 
     print(f"\nApplying to {DB_PATH.relative_to(PROJECT_ROOT)} ...")
     conn = sqlite3.connect(DB_PATH)
@@ -117,8 +116,7 @@ def main() -> int:
 
         # Sanity reports.
         applied = conn.execute(
-            "SELECT jlpt_new, COUNT(*) FROM kanji WHERE jlpt_new IS NOT NULL "
-            "GROUP BY jlpt_new ORDER BY jlpt_new DESC"
+            "SELECT jlpt_new, COUNT(*) FROM kanji WHERE jlpt_new IS NOT NULL GROUP BY jlpt_new ORDER BY jlpt_new DESC"
         ).fetchall()
         total_applied = sum(c for _, c in applied)
         total_kanji = conn.execute("SELECT COUNT(*) FROM kanji").fetchone()[0]
@@ -139,14 +137,13 @@ def main() -> int:
                LIMIT 10"""
         ).fetchall()
 
-        print(f"\n=== jlpt_new distribution ===")
+        print("\n=== jlpt_new distribution ===")
         for lvl, cnt in applied:
             print(f"  N{lvl}: {cnt:,}")
-        print(f"  applied total:  {total_applied:,} / {total_kanji:,} kanji "
-              f"({100 * total_applied / total_kanji:.1f}%)")
+        print(f"  applied total:  {total_applied:,} / {total_kanji:,} kanji ({100 * total_applied / total_kanji:.1f}%)")
         print(f"  db size:        {DB_PATH.stat().st_size:,} bytes")
 
-        print(f"\nCross-tab jlpt_new x jlpt_old (sanity check):")
+        print("\nCross-tab jlpt_new x jlpt_old (sanity check):")
         prev_new = None
         for n_new, n_old, cnt in cross_old:
             if n_new != prev_new:
@@ -155,7 +152,7 @@ def main() -> int:
             label = f"old{n_old}" if n_old is not None else "(none)"
             print(f"    {label:>8} : {cnt:>4}")
 
-        print(f"\nN5 sample (by frequency):")
+        print("\nN5 sample (by frequency):")
         for c, meanings in n5_sample:
             print(f"  {c}  {meanings}")
 

@@ -47,8 +47,8 @@ from __future__ import annotations
 import sqlite3
 import sys
 from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -110,8 +110,7 @@ def iter_kradfile(path: Path) -> Iterator[tuple[str, list[str]]]:
 def main() -> int:
     if not DB_PATH.exists():
         print(
-            f"ERROR: {DB_PATH} not found.\n"
-            "Run scripts/02_parse_kanjidic.py first.",
+            f"ERROR: {DB_PATH} not found.\nRun scripts/02_parse_kanjidic.py first.",
             file=sys.stderr,
         )
         return 1
@@ -120,8 +119,7 @@ def main() -> int:
     if missing:
         names = ", ".join(p.name for p in missing)
         print(
-            f"ERROR: missing source file(s): {names}\n"
-            "Run scripts/01_download_sources.py (with --source kradfile).",
+            f"ERROR: missing source file(s): {names}\nRun scripts/01_download_sources.py (with --source kradfile).",
             file=sys.stderr,
         )
         return 1
@@ -204,16 +202,16 @@ def main() -> int:
                LIMIT 8"""
         ).fetchall()
 
-        print(f"\n=== radicals & kanji_radicals ===")
+        print("\n=== radicals & kanji_radicals ===")
         print(f"  radicals:        {total_radicals:,}")
         print(f"  edges:           {total_edges:,}")
         print(f"  kanji covered:   {covered_kanji:,} (in kanji table)")
         print(f"  kanji orphan:    {orphan_kanji:,} (not in kanji table)")
         print(f"  db size:         {DB_PATH.stat().st_size:,} bytes")
-        print(f"\nTop 10 radicals by kanji count:")
+        print("\nTop 10 radicals by kanji count:")
         for c, n in top_radicals:
             print(f"  {c}  -> {n:,} kanji")
-        print(f"\nSample decompositions (old JLPT 4, ~N5):")
+        print("\nSample decompositions (old JLPT 4, ~N5):")
         for c, decomp in sample_kanji:
             print(f"  {c}  =  {decomp}")
 
