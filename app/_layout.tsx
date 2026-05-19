@@ -7,6 +7,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
+import { SessionProvider } from '@/components/session/session-context';
 import { ProgressDbProvider } from '@/db/progress-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -32,14 +33,16 @@ export default function RootLayout() {
       <Suspense fallback={<LoadingFallback />}>
         <SQLiteProvider databaseName={DB_NAME} assetSource={{ assetId: DB_ASSET }} useSuspense>
           <ProgressDbProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="reviews" options={{ title: 'Reviews' }} />
-                <Stack.Screen name="stage/[character]" options={{ title: '' }} />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
+            <SessionProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <Stack>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="reviews" options={{ title: 'Reviews' }} />
+                  <Stack.Screen name="stage/[character]" options={{ title: '' }} />
+                </Stack>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </SessionProvider>
           </ProgressDbProvider>
         </SQLiteProvider>
       </Suspense>

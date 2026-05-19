@@ -35,7 +35,12 @@ still **due for review** the detail screen surfaces a green "Next due: X
 →" button that navigates (via Stack `replace`, so back-navigation still
 returns to Reviews or Stages, not through every previously-visited stage)
 straight to the next overdue kanji — enabling a quick "session loop"
-through the review queue.
+through the review queue. Once the user reaches Reviews with no remaining
+due kanji and at least one solve was recorded in the current app session,
+the Reviews screen swaps its "All caught up!" empty state for a
+**"Session complete!"** summary panel (N reviewed · X% clean, broken
+down into clean / with-mistake counts; in-memory only, dismissed via a
+button).
 
 ## Getting started
 
