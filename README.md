@@ -11,10 +11,12 @@ then combine kanji to build words. Cross-platform mobile app built with Expo
 Early development. The Python data pipeline (KANJIDIC2, KRADFILE, JLPT N5–N1
 mapping) and the Expo (React Native + TypeScript) app shell are in place.
 The app boots into an **N5 stage selection list** (each row shows ✓ once
-cleared and a "Due" badge when review is overdue); the header surfaces a
-**"N reviews due →" call-to-action** that opens a dedicated **Reviews
-screen** listing only the currently-overdue kanji (sorted most-overdue
-first, empty state shows the next upcoming review time). Tapping any row
+cleared and a "Due" badge when review is overdue); the header always
+exposes a **Reviews link** — rendered as a red prominent "N reviews due
+→" CTA when due > 0 and as a muted outlined "Reviews →" button when
+caught up — that opens a dedicated **Reviews screen** listing only the
+currently-overdue kanji (sorted most-overdue first, empty state shows
+the next upcoming review time or the most recent session summary). Tapping any row
 opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
 readings, stroke count, KRADFILE radical decomposition, an SRS progress
 summary, and a **drag-and-drop build mini-game**: drag chips from an
