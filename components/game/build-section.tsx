@@ -364,10 +364,14 @@ const styles = StyleSheet.create({
   },
   slotEmpty: {
     borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#8884',
-    borderStyle: 'dashed',
-    backgroundColor: '#8881',
+    // Solid border instead of dashed: React Native's `borderStyle: 'dashed'`
+    // renders as solid on iOS, so the empty-slot affordance was nearly
+    // invisible there. Pulling the border weight up to 1.5 and the colour
+    // contrast up to ~50% opacity gives a clear "drop here" frame on both
+    // platforms without relying on the dashed pattern.
+    borderWidth: 1.5,
+    borderColor: '#8888',
+    backgroundColor: '#8882',
   },
   zone: {
     minHeight: 96,
