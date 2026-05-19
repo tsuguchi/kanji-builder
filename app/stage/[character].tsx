@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BuildSection } from '@/components/game/build-section';
+import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useProgressDb } from '@/db/progress-context';
@@ -24,6 +25,7 @@ export default function StageDetailScreen() {
   const { character } = useLocalSearchParams<{ character: string }>();
   const db = useSQLiteContext();
   const progressDb = useProgressDb();
+  const session = useReviewSession();
   const [data, setData] = useState<StageData | null>(null);
   const [progress, setProgress] = useState<KanjiProgress | null>(null);
   const [nextDueCharacter, setNextDueCharacter] = useState<string | null>(null);
@@ -67,6 +69,12 @@ export default function StageDetailScreen() {
 
   const handleFirstSolve = async (result: { hadMistake: boolean }) => {
     if (!character) return;
+    // Record into the ephemeral session log so the Reviews screen can
+    // summarise the burst as a "Session complete!" panel. Runs even when
+    // the user reached this stage via Stages (not Reviews) — they still
+    // earned a solve and the summary will surface if they happen to land
+    // on Reviews afterwards with no remaining Due.
+    session.recordSolve(character, result.hadMistake);
     try {
       const newProgress = await recordSolve(progressDb, character, result);
       setProgress(newProgress);

@@ -3,6 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useProgressDb } from '@/db/progress-context';
@@ -113,7 +114,13 @@ function ReviewRow({ item }: { item: ReviewItem }) {
 }
 
 function EmptyState({ nextUpcoming }: { nextUpcoming: number | null }) {
+  const { solves, dismiss } = useReviewSession();
   const deltaMs = nextUpcoming === null ? null : nextUpcoming - Date.now();
+
+  if (solves.length > 0) {
+    return <SessionSummary onDismiss={dismiss} nextUpcoming={nextUpcoming} />;
+  }
+
   return (
     <ThemedView style={styles.centered}>
       <ThemedText style={styles.emptyGlyph}>✓</ThemedText>
@@ -123,6 +130,49 @@ function EmptyState({ nextUpcoming }: { nextUpcoming: number | null }) {
       ) : (
         <ThemedText style={styles.emptyHint}>Start clearing stages to schedule reviews.</ThemedText>
       )}
+    </ThemedView>
+  );
+}
+
+function SessionSummary({
+  onDismiss,
+  nextUpcoming,
+}: {
+  onDismiss: () => void;
+  nextUpcoming: number | null;
+}) {
+  const { solves } = useReviewSession();
+  const total = solves.length;
+  const clean = solves.filter((s) => !s.hadMistake).length;
+  const withMistake = total - clean;
+  const cleanPct = Math.round((clean / total) * 100);
+  const deltaMs = nextUpcoming === null ? null : nextUpcoming - Date.now();
+
+  return (
+    <ThemedView style={styles.centered}>
+      <ThemedText style={styles.emptyGlyph}>✓</ThemedText>
+      <ThemedText type="title">Session complete!</ThemedText>
+      <ThemedText style={styles.summaryHeadline}>
+        {total} reviewed · {cleanPct}% clean
+      </ThemedText>
+      <View style={styles.summaryBreakdown}>
+        <ThemedText style={styles.summaryCountClean}>{clean} clean</ThemedText>
+        {withMistake > 0 && (
+          <>
+            <ThemedText style={styles.summaryDivider}>·</ThemedText>
+            <ThemedText style={styles.summaryCountMistake}>{withMistake} with mistake</ThemedText>
+          </>
+        )}
+      </View>
+      {deltaMs !== null && deltaMs > 0 && (
+        <ThemedText style={styles.emptyHint}>Next review in {formatDelta(deltaMs)}</ThemedText>
+      )}
+      <Pressable
+        onPress={onDismiss}
+        style={({ pressed }) => [styles.dismissButton, pressed && styles.dismissButtonPressed]}
+      >
+        <ThemedText type="defaultSemiBold">Dismiss</ThemedText>
+      </Pressable>
     </ThemedView>
   );
 }
@@ -198,5 +248,36 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     fontSize: 14,
     textAlign: 'center',
+  },
+  summaryHeadline: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  summaryBreakdown: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+  },
+  summaryCountClean: {
+    color: '#3a9d3a',
+    fontWeight: '600',
+  },
+  summaryCountMistake: {
+    color: '#d18a2a',
+    fontWeight: '600',
+  },
+  summaryDivider: {
+    opacity: 0.4,
+  },
+  dismissButton: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#8886',
+  },
+  dismissButtonPressed: {
+    opacity: 0.5,
   },
 });
