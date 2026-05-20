@@ -185,13 +185,18 @@ export default function StageDetailScreen() {
           <Link href={`/stage/${nextDueCharacter}`} replace asChild>
             <Pressable
               style={({ pressed }) => [
-                styles.nextDueButton,
+                styles.nextDueButtonOuter,
                 pressed && styles.nextDueButtonPressed,
               ]}
             >
-              <ThemedText type="defaultSemiBold" style={styles.nextDueButtonText}>
-                Next due: {nextDueCharacter} →
-              </ThemedText>
+              {/* Inner View carries the visible button frame — see PR #27 /
+                  #28 commit message for the `<Link asChild><Pressable>`
+                  style forwarding caveat. */}
+              <View style={styles.nextDueButton}>
+                <ThemedText type="defaultSemiBold" style={styles.nextDueButtonText}>
+                  Next due: {nextDueCharacter} →
+                </ThemedText>
+              </View>
             </Pressable>
           </Link>
         )}
@@ -286,8 +291,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     fontSize: 13,
   },
-  nextDueButton: {
+  nextDueButtonOuter: {
+    // Pressable scope: positioning + pressed feedback only. Visible frame
+    // lives on the inner View (see PR #28 for the rationale).
     alignSelf: 'flex-start',
+  },
+  nextDueButton: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 10,

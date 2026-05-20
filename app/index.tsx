@@ -84,18 +84,25 @@ export default function StageSelectionScreen() {
         )}
         <Link href="/reviews" asChild>
           <Pressable
-            style={({ pressed }) => [
-              styles.reviewsCta,
-              dueCount > 0 ? styles.reviewsCtaDue : styles.reviewsCtaIdle,
-              pressed && styles.reviewsCtaPressed,
-            ]}
+            style={({ pressed }) => [styles.reviewsCtaOuter, pressed && styles.reviewsCtaPressed]}
           >
-            <ThemedText
-              type="defaultSemiBold"
-              style={dueCount > 0 ? styles.reviewsCtaTextDue : styles.reviewsCtaTextIdle}
+            {/* Inner View carries the visible button frame (background /
+                border / padding) — same `<Link asChild><Pressable>` style
+                forwarding caveat from PR #27 means the frame disappears if
+                applied directly to Pressable. */}
+            <View
+              style={[
+                styles.reviewsCta,
+                dueCount > 0 ? styles.reviewsCtaDue : styles.reviewsCtaIdle,
+              ]}
             >
-              {dueCount > 0 ? `${dueCount} review${dueCount > 1 ? 's' : ''} due →` : 'Reviews →'}
-            </ThemedText>
+              <ThemedText
+                type="defaultSemiBold"
+                style={dueCount > 0 ? styles.reviewsCtaTextDue : styles.reviewsCtaTextIdle}
+              >
+                {dueCount > 0 ? `${dueCount} review${dueCount > 1 ? 's' : ''} due →` : 'Reviews →'}
+              </ThemedText>
+            </View>
           </Pressable>
         </Link>
       </View>
@@ -176,12 +183,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.7,
   },
-  reviewsCta: {
+  reviewsCtaOuter: {
+    // Pressable scope: positioning + pressed feedback only. The visible
+    // frame moves to the inner View (styles.reviewsCta).
     marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  reviewsCta: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    alignSelf: 'flex-start',
   },
   reviewsCtaDue: {
     backgroundColor: '#c66',
