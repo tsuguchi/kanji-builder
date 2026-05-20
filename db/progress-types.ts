@@ -45,6 +45,17 @@ export interface KanjiProgress {
   nextReviewAt: number;
 }
 
+/** Per-day activity statistics summarising the `activity_log` table. */
+export interface ActivityStats {
+  /** Distinct kanji solved at least once today (local day boundary). */
+  todayCount: number;
+  /**
+   * Consecutive local-day count ending today, inclusive. 0 when today has
+   * no activity. Skipping a day (or starting fresh) resets to 0 / 1.
+   */
+  streakDays: number;
+}
+
 /** Schema applied via `db.execAsync` on every open (idempotent IF NOT EXISTS). */
 export const PROGRESS_SCHEMA = `
   CREATE TABLE IF NOT EXISTS kanji_progress (
@@ -55,4 +66,16 @@ export const PROGRESS_SCHEMA = `
     next_review_at    INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_progress_next_review ON kanji_progress(next_review_at);
+
+  -- Per-event log so we can compute streaks and per-day counts independently
+  -- of the kanji_progress upsert (which only retains the latest review per
+  -- character). Existing DBs without this table will get it on next open.
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    character    TEXT NOT NULL,
+    had_mistake  INTEGER NOT NULL,
+    at           INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_activity_at ON activity_log(at);
+  CREATE INDEX IF NOT EXISTS idx_activity_character ON activity_log(character);
 `;

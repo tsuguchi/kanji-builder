@@ -1,6 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { SRS_STAGE_INTERVALS_MS, type KanjiProgress, type SrsStage } from '@/db/progress-types';
+import {
+  SRS_STAGE_INTERVALS_MS,
+  type ActivityStats,
+  type KanjiProgress,
+  type SrsStage,
+} from '@/db/progress-types';
 
 interface ProgressRow {
   character: string;
@@ -138,6 +143,14 @@ export async function recordSolve(
     [character, nextStage, clearedAt, now, nextReviewAt],
   );
 
+  // Also append to the per-event log so streak / daily-count stats survive
+  // independently of the kanji_progress upsert. INSERT-only — never updated.
+  await db.runAsync(`INSERT INTO activity_log (character, had_mistake, at) VALUES (?, ?, ?)`, [
+    character,
+    options.hadMistake ? 1 : 0,
+    now,
+  ]);
+
   return {
     character,
     srsStage: nextStage,
@@ -145,4 +158,74 @@ export async function recordSolve(
     lastReviewedAt: now,
     nextReviewAt,
   };
+}
+
+/**
+ * Aggregate activity log entries into per-day stats:
+ *
+ * - `todayCount`: distinct kanji solved at least once today (local-day
+ *   boundary, derived from each event's `at` timestamp).
+ * - `streakDays`: consecutive local days with at least one event, walking
+ *   back from today. 0 if today has no activity yet.
+ *
+ * Streak uses local time so a user's "day" matches the wall clock they live
+ * in. Reading every distinct day key is fine even for years of activity —
+ * a few thousand integers at most.
+ */
+export async function getActivityStats(
+  db: SQLiteDatabase,
+  now: number = Date.now(),
+): Promise<ActivityStats> {
+  const todayStart = startOfLocalDay(now);
+  const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
+
+  // Distinct kanji solved today (de-dup across multiple solves of the same
+  // character within the day).
+  const todayRow = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(DISTINCT character) AS count
+       FROM activity_log
+      WHERE at >= ? AND at < ?`,
+    [todayStart, tomorrowStart],
+  );
+  const todayCount = todayRow?.count ?? 0;
+
+  // Collect timestamps of every activity ever; project to local-day keys in
+  // JS. Most projects won't approach the millions of events where this is
+  // wasteful.
+  const allRows = await db.getAllAsync<{ at: number }>(
+    `SELECT at FROM activity_log ORDER BY at DESC`,
+  );
+  const dayKeys = new Set(allRows.map((r) => localDayKey(r.at)));
+  const streakDays = computeStreakDays(dayKeys, now);
+
+  return { todayCount, streakDays };
+}
+
+/** Local-day boundary (00:00 local time of `now`'s day) in epoch ms. */
+function startOfLocalDay(now: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/** `YYYY-MM-DD` in local time. Suitable as a Set key for day grouping. */
+function localDayKey(at: number): string {
+  const d = new Date(at);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function computeStreakDays(dayKeys: Set<string>, now: number): number {
+  let streak = 0;
+  // Use Date arithmetic so DST transitions don't accidentally skip a day
+  // (JST has no DST, but the app targets learners worldwide).
+  const cursor = new Date(now);
+  cursor.setHours(0, 0, 0, 0);
+  while (dayKeys.has(localDayKey(cursor.getTime()))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
