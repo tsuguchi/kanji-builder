@@ -1,12 +1,13 @@
-import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BuildSection } from '@/components/game/build-section';
 import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import { getDueProgress, getProgressFor, recordSolve } from '@/db/progress-queries';
 import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
@@ -182,23 +183,16 @@ export default function StageDetailScreen() {
         />
 
         {nextDueCharacter && (
-          <Link href={`/stage/${nextDueCharacter}`} replace asChild>
-            <Pressable
-              style={({ pressed }) => [
-                styles.nextDueButtonOuter,
-                pressed && styles.nextDueButtonPressed,
-              ]}
-            >
-              {/* Inner View carries the visible button frame — see PR #27 /
-                  #28 commit message for the `<Link asChild><Pressable>`
-                  style forwarding caveat. */}
-              <View style={styles.nextDueButton}>
-                <ThemedText type="defaultSemiBold" style={styles.nextDueButtonText}>
-                  Next due: {nextDueCharacter} →
-                </ThemedText>
-              </View>
-            </Pressable>
-          </Link>
+          <LinkButton
+            href={`/stage/${nextDueCharacter}`}
+            replace
+            outerStyle={styles.nextDueButtonOuter}
+            innerStyle={styles.nextDueButton}
+          >
+            <ThemedText type="defaultSemiBold" style={styles.nextDueButtonText}>
+              Next due: {nextDueCharacter} →
+            </ThemedText>
+          </LinkButton>
         )}
       </ScrollView>
     </ThemedView>
@@ -301,9 +295,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     backgroundColor: '#3a9d3a',
-  },
-  nextDueButtonPressed: {
-    opacity: 0.6,
   },
   nextDueButtonText: {
     color: '#fff',

@@ -1,4 +1,4 @@
-import { Link, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-
 import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import { getDueProgress, getNextUpcomingReviewAt } from '@/db/progress-queries';
 import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
@@ -96,23 +97,22 @@ function ReviewRow({ item }: { item: ReviewItem }) {
   const { kanji, progress } = item;
   const overdueMs = Date.now() - progress.nextReviewAt;
   return (
-    <Link href={`/stage/${kanji.character}`} asChild>
-      <Pressable style={({ pressed }) => [styles.rowOuter, pressed && styles.rowPressed]}>
-        {/* Inner view holds horizontal layout; see app/index.tsx for context. */}
-        <View style={styles.row}>
-          <ThemedText style={styles.glyph}>{kanji.character}</ThemedText>
-          <View style={styles.rowBody}>
-            <ThemedText type="defaultSemiBold">
-              {kanji.meaningsEn.slice(0, 3).join(', ') || '—'}
-            </ThemedText>
-            <ThemedText style={styles.meta}>
-              {SRS_STAGE_LABELS[progress.srsStage]} · due {formatDelta(overdueMs)} ago
-            </ThemedText>
-          </View>
-          <ThemedText style={styles.chevron}>›</ThemedText>
-        </View>
-      </Pressable>
-    </Link>
+    <LinkButton
+      href={`/stage/${kanji.character}`}
+      outerStyle={styles.rowOuter}
+      innerStyle={styles.row}
+    >
+      <ThemedText style={styles.glyph}>{kanji.character}</ThemedText>
+      <View style={styles.rowBody}>
+        <ThemedText type="defaultSemiBold">
+          {kanji.meaningsEn.slice(0, 3).join(', ') || '—'}
+        </ThemedText>
+        <ThemedText style={styles.meta}>
+          {SRS_STAGE_LABELS[progress.srsStage]} · due {formatDelta(overdueMs)} ago
+        </ThemedText>
+      </View>
+      <ThemedText style={styles.chevron}>›</ThemedText>
+    </LinkButton>
   );
 }
 
@@ -221,9 +221,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-  },
-  rowPressed: {
-    opacity: 0.6,
   },
   glyph: {
     fontSize: 40,
