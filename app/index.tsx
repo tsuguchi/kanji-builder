@@ -1,10 +1,11 @@
-import { Link, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import { getActivityStats, getAllProgress } from '@/db/progress-queries';
 import type { ActivityStats, KanjiProgress } from '@/db/progress-types';
@@ -82,29 +83,21 @@ export default function StageSelectionScreen() {
               `${activity.streakDays}-day streak${activity.streakDays >= 7 ? ' 🔥' : ''}`}
           </ThemedText>
         )}
-        <Link href="/reviews" asChild>
-          <Pressable
-            style={({ pressed }) => [styles.reviewsCtaOuter, pressed && styles.reviewsCtaPressed]}
+        <LinkButton
+          href="/reviews"
+          outerStyle={styles.reviewsCtaOuter}
+          innerStyle={[
+            styles.reviewsCta,
+            dueCount > 0 ? styles.reviewsCtaDue : styles.reviewsCtaIdle,
+          ]}
+        >
+          <ThemedText
+            type="defaultSemiBold"
+            style={dueCount > 0 ? styles.reviewsCtaTextDue : styles.reviewsCtaTextIdle}
           >
-            {/* Inner View carries the visible button frame (background /
-                border / padding) — same `<Link asChild><Pressable>` style
-                forwarding caveat from PR #27 means the frame disappears if
-                applied directly to Pressable. */}
-            <View
-              style={[
-                styles.reviewsCta,
-                dueCount > 0 ? styles.reviewsCtaDue : styles.reviewsCtaIdle,
-              ]}
-            >
-              <ThemedText
-                type="defaultSemiBold"
-                style={dueCount > 0 ? styles.reviewsCtaTextDue : styles.reviewsCtaTextIdle}
-              >
-                {dueCount > 0 ? `${dueCount} review${dueCount > 1 ? 's' : ''} due →` : 'Reviews →'}
-              </ThemedText>
-            </View>
-          </Pressable>
-        </Link>
+            {dueCount > 0 ? `${dueCount} review${dueCount > 1 ? 's' : ''} due →` : 'Reviews →'}
+          </ThemedText>
+        </LinkButton>
       </View>
       <FlatList
         data={stages}
@@ -131,34 +124,29 @@ function StageRow({
   const isDue = progress !== undefined && progress.nextReviewAt <= now;
   const isCleared = progress !== undefined;
   return (
-    <Link href={`/stage/${stage.character}`} asChild>
-      <Pressable style={({ pressed }) => [styles.rowOuter, pressed && styles.rowPressed]}>
-        {/* Inner view holds the horizontal layout: <Link asChild> + Pressable
-            on the new RN architecture sometimes drops the function-style
-            output's `flexDirection` for the touchable's underlying view,
-            collapsing the row vertically. Anchoring layout to an explicit
-            inner <View> sidesteps that. */}
-        <View style={styles.row}>
-          <ThemedText style={styles.order}>{String(order).padStart(2, '0')}</ThemedText>
-          <ThemedText style={styles.glyph}>{stage.character}</ThemedText>
-          <View style={styles.rowBody}>
-            <ThemedText type="defaultSemiBold">
-              {stage.meaningsEn.slice(0, 3).join(', ') || '—'}
-            </ThemedText>
-            <ThemedText style={styles.meta}>{stage.strokeCount} strokes</ThemedText>
+    <LinkButton
+      href={`/stage/${stage.character}`}
+      outerStyle={styles.rowOuter}
+      innerStyle={styles.row}
+    >
+      <ThemedText style={styles.order}>{String(order).padStart(2, '0')}</ThemedText>
+      <ThemedText style={styles.glyph}>{stage.character}</ThemedText>
+      <View style={styles.rowBody}>
+        <ThemedText type="defaultSemiBold">
+          {stage.meaningsEn.slice(0, 3).join(', ') || '—'}
+        </ThemedText>
+        <ThemedText style={styles.meta}>{stage.strokeCount} strokes</ThemedText>
+      </View>
+      <View style={styles.badges}>
+        {isDue && (
+          <View style={styles.dueBadge}>
+            <ThemedText style={styles.dueBadgeText}>Due</ThemedText>
           </View>
-          <View style={styles.badges}>
-            {isDue && (
-              <View style={styles.dueBadge}>
-                <ThemedText style={styles.dueBadgeText}>Due</ThemedText>
-              </View>
-            )}
-            {isCleared && <ThemedText style={styles.checkMark}>✓</ThemedText>}
-          </View>
-          <ThemedText style={styles.chevron}>›</ThemedText>
-        </View>
-      </Pressable>
-    </Link>
+        )}
+        {isCleared && <ThemedText style={styles.checkMark}>✓</ThemedText>}
+      </View>
+      <ThemedText style={styles.chevron}>›</ThemedText>
+    </LinkButton>
   );
 }
 
@@ -207,9 +195,6 @@ const styles = StyleSheet.create({
     borderColor: '#8886',
     backgroundColor: 'transparent',
   },
-  reviewsCtaPressed: {
-    opacity: 0.6,
-  },
   reviewsCtaTextDue: {
     color: '#fff',
     fontSize: 14,
@@ -234,9 +219,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-  },
-  rowPressed: {
-    opacity: 0.6,
   },
   order: {
     width: 28,
