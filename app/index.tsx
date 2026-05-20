@@ -6,8 +6,8 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useProgressDb } from '@/db/progress-context';
-import { getAllProgress } from '@/db/progress-queries';
-import type { KanjiProgress } from '@/db/progress-types';
+import { getActivityStats, getAllProgress } from '@/db/progress-queries';
+import type { ActivityStats, KanjiProgress } from '@/db/progress-types';
 import { getKanjiByJlptNew } from '@/db/queries';
 import type { Kanji } from '@/db/types';
 
@@ -16,6 +16,7 @@ export default function StageSelectionScreen() {
   const progressDb = useProgressDb();
   const [stages, setStages] = useState<Kanji[] | null>(null);
   const [progress, setProgress] = useState<Map<string, KanjiProgress>>(new Map());
+  const [activity, setActivity] = useState<ActivityStats>({ todayCount: 0, streakDays: 0 });
   const [error, setError] = useState<string | null>(null);
 
   useFocusEffect(
@@ -23,13 +24,15 @@ export default function StageSelectionScreen() {
       let cancelled = false;
       (async () => {
         try {
-          const [n5, allProgress] = await Promise.all([
+          const [n5, allProgress, stats] = await Promise.all([
             getKanjiByJlptNew(db, 5),
             getAllProgress(progressDb),
+            getActivityStats(progressDb),
           ]);
           if (!cancelled) {
             setStages(n5);
             setProgress(new Map(allProgress.map((p) => [p.character, p])));
+            setActivity(stats);
           }
         } catch (e) {
           if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -62,6 +65,8 @@ export default function StageSelectionScreen() {
   const now = Date.now();
   const dueCount = Array.from(progress.values()).filter((p) => p.nextReviewAt <= now).length;
 
+  const hasActivity = activity.todayCount > 0 || activity.streakDays > 0;
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -69,6 +74,14 @@ export default function StageSelectionScreen() {
         <ThemedText type="subtitle">
           {clearedCount}/{stages.length} cleared
         </ThemedText>
+        {hasActivity && (
+          <ThemedText style={styles.activityLine}>
+            {activity.todayCount > 0 && `${activity.todayCount} today`}
+            {activity.todayCount > 0 && activity.streakDays > 0 && ' · '}
+            {activity.streakDays > 0 &&
+              `${activity.streakDays}-day streak${activity.streakDays >= 7 ? ' 🔥' : ''}`}
+          </ThemedText>
+        )}
         <Link href="/reviews" asChild>
           <Pressable
             style={({ pressed }) => [
@@ -151,6 +164,10 @@ const styles = StyleSheet.create({
     paddingTop: 64,
     paddingBottom: 12,
     gap: 4,
+  },
+  activityLine: {
+    fontSize: 13,
+    opacity: 0.7,
   },
   reviewsCta: {
     marginTop: 8,

@@ -16,7 +16,10 @@ exposes a **Reviews link** — rendered as a red prominent "N reviews due
 →" CTA when due > 0 and as a muted outlined "Reviews →" button when
 caught up — that opens a dedicated **Reviews screen** listing only the
 currently-overdue kanji (sorted most-overdue first, empty state shows
-the next upcoming review time or the most recent session summary). Tapping any row
+the next upcoming review time or the most recent session summary).
+A subtle activity line ("N today · M-day streak 🔥 at 7+") shows daily
+solve count and the current consecutive-day streak, sourced from a
+write-only `activity_log` table that's appended on every solve. Tapping any row
 opens a **stage detail screen** showing the kanji glyph, meanings, on/kun
 readings, stroke count, KRADFILE radical decomposition, an SRS progress
 summary, and a **drag-and-drop build mini-game**: the build zone shows
