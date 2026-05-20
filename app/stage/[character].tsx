@@ -292,11 +292,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   nextDueButtonOuter: {
-    // Pressable scope: positioning + pressed feedback only. Visible frame
-    // lives on the inner View (see PR #28 for the rationale).
-    alignSelf: 'flex-start',
+    // Pressable scope only. `alignSelf` moved to the inner View — same
+    // reason as Reviews CTA (Pressable on new arch drops the property).
   },
   nextDueButton: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 10,

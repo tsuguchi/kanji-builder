@@ -187,9 +187,14 @@ const styles = StyleSheet.create({
     // Pressable scope: positioning + pressed feedback only. The visible
     // frame moves to the inner View (styles.reviewsCta).
     marginTop: 8,
-    alignSelf: 'flex-start',
+    // `alignSelf` deliberately not here — see PR #28: Pressable on the new
+    // arch drops function-style properties. We move alignSelf to the inner
+    // View instead so the visible button stays content-width. The Pressable
+    // ends up full-width, which is actually fine: more touch area for the
+    // same compact red button.
   },
   reviewsCta: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
