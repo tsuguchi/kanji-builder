@@ -97,17 +97,20 @@ function ReviewRow({ item }: { item: ReviewItem }) {
   const overdueMs = Date.now() - progress.nextReviewAt;
   return (
     <Link href={`/stage/${kanji.character}`} asChild>
-      <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-        <ThemedText style={styles.glyph}>{kanji.character}</ThemedText>
-        <View style={styles.rowBody}>
-          <ThemedText type="defaultSemiBold">
-            {kanji.meaningsEn.slice(0, 3).join(', ') || '—'}
-          </ThemedText>
-          <ThemedText style={styles.meta}>
-            {SRS_STAGE_LABELS[progress.srsStage]} · due {formatDelta(overdueMs)} ago
-          </ThemedText>
+      <Pressable style={({ pressed }) => [styles.rowOuter, pressed && styles.rowPressed]}>
+        {/* Inner view holds horizontal layout; see app/index.tsx for context. */}
+        <View style={styles.row}>
+          <ThemedText style={styles.glyph}>{kanji.character}</ThemedText>
+          <View style={styles.rowBody}>
+            <ThemedText type="defaultSemiBold">
+              {kanji.meaningsEn.slice(0, 3).join(', ') || '—'}
+            </ThemedText>
+            <ThemedText style={styles.meta}>
+              {SRS_STAGE_LABELS[progress.srsStage]} · due {formatDelta(overdueMs)} ago
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.chevron}>›</ThemedText>
         </View>
-        <ThemedText style={styles.chevron}>›</ThemedText>
       </Pressable>
     </Link>
   );
@@ -208,14 +211,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+  rowOuter: {
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8884',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
   rowPressed: {
     opacity: 0.6,

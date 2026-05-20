@@ -125,24 +125,31 @@ function StageRow({
   const isCleared = progress !== undefined;
   return (
     <Link href={`/stage/${stage.character}`} asChild>
-      <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-        <ThemedText style={styles.order}>{String(order).padStart(2, '0')}</ThemedText>
-        <ThemedText style={styles.glyph}>{stage.character}</ThemedText>
-        <View style={styles.rowBody}>
-          <ThemedText type="defaultSemiBold">
-            {stage.meaningsEn.slice(0, 3).join(', ') || '—'}
-          </ThemedText>
-          <ThemedText style={styles.meta}>{stage.strokeCount} strokes</ThemedText>
+      <Pressable style={({ pressed }) => [styles.rowOuter, pressed && styles.rowPressed]}>
+        {/* Inner view holds the horizontal layout: <Link asChild> + Pressable
+            on the new RN architecture sometimes drops the function-style
+            output's `flexDirection` for the touchable's underlying view,
+            collapsing the row vertically. Anchoring layout to an explicit
+            inner <View> sidesteps that. */}
+        <View style={styles.row}>
+          <ThemedText style={styles.order}>{String(order).padStart(2, '0')}</ThemedText>
+          <ThemedText style={styles.glyph}>{stage.character}</ThemedText>
+          <View style={styles.rowBody}>
+            <ThemedText type="defaultSemiBold">
+              {stage.meaningsEn.slice(0, 3).join(', ') || '—'}
+            </ThemedText>
+            <ThemedText style={styles.meta}>{stage.strokeCount} strokes</ThemedText>
+          </View>
+          <View style={styles.badges}>
+            {isDue && (
+              <View style={styles.dueBadge}>
+                <ThemedText style={styles.dueBadgeText}>Due</ThemedText>
+              </View>
+            )}
+            {isCleared && <ThemedText style={styles.checkMark}>✓</ThemedText>}
+          </View>
+          <ThemedText style={styles.chevron}>›</ThemedText>
         </View>
-        <View style={styles.badges}>
-          {isDue && (
-            <View style={styles.dueBadge}>
-              <ThemedText style={styles.dueBadgeText}>Due</ThemedText>
-            </View>
-          )}
-          {isCleared && <ThemedText style={styles.checkMark}>✓</ThemedText>}
-        </View>
-        <ThemedText style={styles.chevron}>›</ThemedText>
       </Pressable>
     </Link>
   );
@@ -199,14 +206,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+  rowOuter: {
+    // Border / padding stay on the outer Pressable so the tap area covers
+    // the full row visually.
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#8884',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
   rowPressed: {
     opacity: 0.6,
