@@ -1,6 +1,14 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { decodeKanji, type Kanji, type KanjiRow, type RadicalDecomposition } from '@/db/types';
+import {
+  decodeKanji,
+  decodeWord,
+  type Kanji,
+  type KanjiRow,
+  type RadicalDecomposition,
+  type Word,
+  type WordRow,
+} from '@/db/types';
 
 /**
  * Kanji at the given modern JLPT level, ordered by newspaper frequency
@@ -75,6 +83,29 @@ export async function getRadicalsForKanji(
       ORDER BY radical_char`,
     [kanjiChar],
   );
+}
+
+/**
+ * JLPT vocab words that contain the given kanji, ordered easiest-first
+ * (highest jlpt_new) then by expression length so short, common words
+ * surface above longer compounds. Used by the Stage detail screen to show
+ * "this kanji is used in these words" alongside the radical decomposition.
+ *
+ * The `words` / `word_kanji` tables come from the jamsinclair vocab list
+ * (see scripts/05_parse_jlpt_vocab.py). DISTINCT is needed because a
+ * single kanji can appear multiple times in a word (e.g. 日日 — though
+ * with position the JOIN can return one row per occurrence).
+ */
+export async function getWordsForKanji(db: SQLiteDatabase, kanjiChar: string): Promise<Word[]> {
+  const rows = await db.getAllAsync<WordRow>(
+    `SELECT DISTINCT w.id, w.expression, w.reading, w.meanings_en, w.jlpt_new, w.source_guid
+       FROM words w
+       JOIN word_kanji wk ON wk.word_id = w.id
+      WHERE wk.kanji_char = ?
+      ORDER BY w.jlpt_new DESC, length(w.expression), w.expression`,
+    [kanjiChar],
+  );
+  return rows.map(decodeWord);
 }
 
 /**

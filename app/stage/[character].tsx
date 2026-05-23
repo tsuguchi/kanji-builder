@@ -11,8 +11,13 @@ import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import { getDueProgress, getProgressFor, recordSolve } from '@/db/progress-queries';
 import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
-import { getDistractorRadicals, getKanjiByCharacter, getRadicalsForKanji } from '@/db/queries';
-import type { Kanji, RadicalDecomposition } from '@/db/types';
+import {
+  getDistractorRadicals,
+  getKanjiByCharacter,
+  getRadicalsForKanji,
+  getWordsForKanji,
+} from '@/db/queries';
+import type { Kanji, RadicalDecomposition, Word } from '@/db/types';
 
 const DISTRACTOR_COUNT = 3;
 
@@ -20,6 +25,7 @@ interface StageData {
   kanji: Kanji;
   radicals: RadicalDecomposition[];
   distractors: string[];
+  words: Word[];
 }
 
 export default function StageDetailScreen() {
@@ -45,15 +51,18 @@ export default function StageDetailScreen() {
         }
         const radicals = await getRadicalsForKanji(db, character);
         const level = kanji.jlptNew ?? 5;
-        const distractors = await getDistractorRadicals(
-          db,
-          level,
-          radicals.map((r) => r.radicalChar),
-          DISTRACTOR_COUNT,
-        );
-        const existingProgress = await getProgressFor(progressDb, character);
+        const [distractors, words, existingProgress] = await Promise.all([
+          getDistractorRadicals(
+            db,
+            level,
+            radicals.map((r) => r.radicalChar),
+            DISTRACTOR_COUNT,
+          ),
+          getWordsForKanji(db, character),
+          getProgressFor(progressDb, character),
+        ]);
         if (!cancelled) {
-          setData({ kanji, radicals, distractors });
+          setData({ kanji, radicals, distractors, words });
           setProgress(existingProgress);
           // Clear stale next-due nudge from the previous stage; it will be
           // recomputed when the user solves this one.
@@ -122,7 +131,7 @@ export default function StageDetailScreen() {
     );
   }
 
-  const { kanji, radicals, distractors } = data;
+  const { kanji, radicals, distractors, words } = data;
 
   return (
     <ThemedView style={styles.container}>
@@ -162,6 +171,20 @@ export default function StageDetailScreen() {
             <View style={styles.chipRow}>
               {radicals.map((r) => (
                 <RadicalChip key={r.radicalChar} radical={r} />
+              ))}
+            </View>
+          )}
+        </Section>
+
+        <Section title={`Words using this kanji (${words.length})`}>
+          {words.length === 0 ? (
+            <ThemedText style={styles.notCleared}>
+              (no N5-N1 vocab list entry uses this kanji)
+            </ThemedText>
+          ) : (
+            <View style={styles.wordList}>
+              {words.map((w) => (
+                <WordRow key={w.id} word={w} />
               ))}
             </View>
           )}
@@ -240,6 +263,26 @@ function RadicalChip({ radical }: { radical: RadicalDecomposition }) {
     <View style={styles.chip}>
       <ThemedText style={styles.chipGlyph}>{radical.radicalChar}</ThemedText>
       {radical.count > 1 && <ThemedText style={styles.chipCount}>×{radical.count}</ThemedText>}
+    </View>
+  );
+}
+
+function WordRow({ word }: { word: Word }) {
+  // Cap meaning preview to keep rows compact; full meaning list is available
+  // on the (future) word-puzzle screen when the row becomes tappable.
+  const meaning = word.meaningsEn.slice(0, 2).join('; ') || '—';
+  return (
+    <View style={styles.wordRow}>
+      <View style={styles.wordExprBox}>
+        <ThemedText style={styles.wordExpr}>{word.expression}</ThemedText>
+        <ThemedText style={styles.wordReading}>{word.reading}</ThemedText>
+      </View>
+      <ThemedText style={styles.wordMeaning} numberOfLines={2}>
+        {meaning}
+      </ThemedText>
+      <View style={styles.wordLevelBadge}>
+        <ThemedText style={styles.wordLevelText}>N{word.jlptNew}</ThemedText>
+      </View>
     </View>
   );
 }
@@ -337,6 +380,43 @@ const styles = StyleSheet.create({
   },
   chipCount: {
     fontSize: 12,
+    opacity: 0.6,
+  },
+  wordList: {
+    gap: 8,
+  },
+  wordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 6,
+  },
+  wordExprBox: {
+    minWidth: 88,
+    gap: 1,
+  },
+  wordExpr: {
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  wordReading: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  wordMeaning: {
+    flex: 1,
+    fontSize: 13,
+    opacity: 0.75,
+  },
+  wordLevelBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#8888',
+  },
+  wordLevelText: {
+    fontSize: 11,
     opacity: 0.6,
   },
 });
