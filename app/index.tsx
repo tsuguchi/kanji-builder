@@ -1,37 +1,60 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LevelSegment, type LevelCount } from '@/components/ui/level-segment';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import { getActivityStats, getAllProgress } from '@/db/progress-queries';
 import type { ActivityStats, KanjiProgress } from '@/db/progress-types';
 import { getKanjiByJlptNew } from '@/db/queries';
 import type { Kanji } from '@/db/types';
+import {
+  ALL_LEVELS,
+  DEFAULT_LEVEL,
+  getSelectedLevel,
+  setSelectedLevel as persistSelectedLevel,
+} from '@/lib/preferences';
 
 export default function StageSelectionScreen() {
   const db = useSQLiteContext();
   const progressDb = useProgressDb();
-  const [stages, setStages] = useState<Kanji[] | null>(null);
+  // Map<level, kanji[]>. All 5 JLPT levels are pre-loaded once so switching
+  // tabs is instantaneous and per-level badges can be computed without
+  // additional queries. Total payload is ~2200 kanji which is small in
+  // memory but big enough that we only fetch on focus, not on every render.
+  const [kanjiByLevel, setKanjiByLevel] = useState<Map<number, Kanji[]> | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<number>(DEFAULT_LEVEL);
   const [progress, setProgress] = useState<Map<string, KanjiProgress>>(new Map());
   const [activity, setActivity] = useState<ActivityStats>({ todayCount: 0, streakDays: 0 });
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await getSelectedLevel();
+      if (!cancelled) setSelectedLevel(saved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
         try {
-          const [n5, allProgress, stats] = await Promise.all([
-            getKanjiByJlptNew(db, 5),
+          const [perLevel, allProgress, stats] = await Promise.all([
+            Promise.all(ALL_LEVELS.map((lv) => getKanjiByJlptNew(db, lv))),
             getAllProgress(progressDb),
             getActivityStats(progressDb),
           ]);
           if (!cancelled) {
-            setStages(n5);
+            setKanjiByLevel(new Map(ALL_LEVELS.map((lv, i) => [lv, perLevel[i]])));
             setProgress(new Map(allProgress.map((p) => [p.character, p])));
             setActivity(stats);
           }
@@ -45,6 +68,22 @@ export default function StageSelectionScreen() {
     }, [db, progressDb]),
   );
 
+  const levelCounts = useMemo(() => {
+    const map = new Map<number, LevelCount>();
+    if (!kanjiByLevel) return map;
+    for (const lv of ALL_LEVELS) {
+      const list = kanjiByLevel.get(lv) ?? [];
+      const cleared = list.reduce((n, k) => (progress.has(k.character) ? n + 1 : n), 0);
+      map.set(lv, { cleared, total: list.length });
+    }
+    return map;
+  }, [kanjiByLevel, progress]);
+
+  const handleSelectLevel = useCallback((level: number) => {
+    setSelectedLevel(level);
+    void persistSelectedLevel(level);
+  }, []);
+
   if (error) {
     return (
       <ThemedView style={styles.centered}>
@@ -54,7 +93,7 @@ export default function StageSelectionScreen() {
     );
   }
 
-  if (stages === null) {
+  if (kanjiByLevel === null) {
     return (
       <ThemedView style={styles.centered}>
         <ActivityIndicator />
@@ -62,8 +101,12 @@ export default function StageSelectionScreen() {
     );
   }
 
-  const clearedCount = progress.size;
+  const stages = kanjiByLevel.get(selectedLevel) ?? [];
+  const selectedCount = levelCounts.get(selectedLevel);
   const now = Date.now();
+  // dueCount is intentionally global (not filtered to selectedLevel) — the
+  // Reviews screen itself is level-agnostic, so the CTA should reflect every
+  // pending review regardless of which tab the user is currently browsing.
   const dueCount = Array.from(progress.values()).filter((p) => p.nextReviewAt <= now).length;
 
   const hasActivity = activity.todayCount > 0 || activity.streakDays > 0;
@@ -71,9 +114,9 @@ export default function StageSelectionScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="title">N5 Stages</ThemedText>
+        <ThemedText type="title">N{selectedLevel} Stages</ThemedText>
         <ThemedText type="subtitle">
-          {clearedCount}/{stages.length} cleared
+          {selectedCount?.cleared ?? 0}/{selectedCount?.total ?? stages.length} cleared
         </ThemedText>
         {hasActivity && (
           <ThemedText style={styles.activityLine}>
@@ -83,6 +126,12 @@ export default function StageSelectionScreen() {
               `${activity.streakDays}-day streak${activity.streakDays >= 7 ? ' 🔥' : ''}`}
           </ThemedText>
         )}
+        <LevelSegment
+          levels={ALL_LEVELS}
+          selected={selectedLevel}
+          onSelect={handleSelectLevel}
+          counts={levelCounts}
+        />
         <LinkButton
           href="/reviews"
           outerStyle={styles.reviewsCtaOuter}
@@ -129,7 +178,9 @@ function StageRow({
       outerStyle={styles.rowOuter}
       innerStyle={styles.row}
     >
-      <ThemedText style={styles.order}>{String(order).padStart(2, '0')}</ThemedText>
+      <ThemedText style={styles.order} numberOfLines={1}>
+        {String(order).padStart(2, '0')}
+      </ThemedText>
       <ThemedText style={styles.glyph}>{stage.character}</ThemedText>
       <View style={styles.rowBody}>
         <ThemedText type="defaultSemiBold">
@@ -221,7 +272,10 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   order: {
-    width: 28,
+    // N1 has 1232 stages → 4 digits. Width covers that case so the column
+    // never wraps onto a second line (kept right-aligned so the trailing
+    // digit lines up across short and long numbers).
+    width: 40,
     fontSize: 13,
     opacity: 0.5,
     textAlign: 'right',
