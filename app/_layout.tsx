@@ -31,7 +31,17 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Suspense fallback={<LoadingFallback />}>
-        <SQLiteProvider databaseName={DB_NAME} assetSource={{ assetId: DB_ASSET }} useSuspense>
+        <SQLiteProvider
+          databaseName={DB_NAME}
+          // `forceOverwrite: __DEV__` re-copies the bundled asset on every
+          // dev launch so schema changes in scripts/05 (and future pipeline
+          // updates) take effect without manually wiping app data. In
+          // production it's `false` — the bundled DB is copied once on
+          // first launch and never re-copied. Production schema migrations
+          // will need explicit version handling when we get there.
+          assetSource={{ assetId: DB_ASSET, forceOverwrite: __DEV__ }}
+          useSuspense
+        >
           <ProgressDbProvider>
             <SessionProvider>
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

@@ -5,6 +5,7 @@ Sources & licenses (see project README for full attribution):
   - KANJIDIC2:   https://www.edrdg.org/kanjidic/kanjidic2.xml.gz                       (CC BY-SA 4.0)
   - KRADFILE:    http://ftp.edrdg.org/pub/Nihongo/kradzip.zip                          (EDRDG License)
   - kanji-data:  davidluzgouveia/kanji-data — provides modern N5-N1 mapping            (MIT)
+  - JLPT vocab:  jamsinclair/open-anki-jlpt-decks — N5-N1 word lists                   (MIT)
   - JMdict:      https://www.edrdg.org/pub/Nihongo/JMdict_e.gz                         (CC BY-SA 4.0) (TODO)
   - KanjiVG:     https://github.com/KanjiVG/kanjivg/releases                            (CC BY-SA 3.0) (TODO)
   - Tatoeba:     https://downloads.tatoeba.org/exports/sentences.tar.bz2               (CC BY 2.0 FR) (TODO)
@@ -49,6 +50,8 @@ class Source:
     license: str
 
 
+JLPT_VOCAB_URL_BASE = "https://raw.githubusercontent.com/jamsinclair/open-anki-jlpt-decks/main/src"
+
 SOURCES: list[Source] = [
     Source(
         name="kanjidic2",
@@ -74,6 +77,21 @@ SOURCES: list[Source] = [
         members=["kanji-data.json"],
         license="MIT (davidluzgouveia/kanji-data) — provides JLPT N5-N1 mapping",
     ),
+    # JLPT vocab lists, one CSV per level. Filtered downstream in
+    # scripts/05_parse_jlpt_vocab.py to keep only kanji-containing entries
+    # with an explicit `JLPT_N{level}` tag (the CSV also carries legacy
+    # `JLPT_4`/`JLPT_5` 4-level tags which we ignore).
+    *[
+        Source(
+            name=f"jlpt-vocab-n{level}",
+            url=f"{JLPT_VOCAB_URL_BASE}/n{level}.csv",
+            archive=f"jlpt-vocab-n{level}.csv",
+            fmt="plain",
+            members=[f"jlpt-vocab-n{level}.csv"],
+            license="MIT (jamsinclair/open-anki-jlpt-decks) — Tanos-derived JLPT N5-N1 vocab",
+        )
+        for level in (5, 4, 3, 2, 1)
+    ],
 ]
 
 

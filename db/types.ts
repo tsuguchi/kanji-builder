@@ -38,6 +38,37 @@ export interface RadicalDecomposition {
   count: number;
 }
 
+/** Raw row shape returned by SQLite for the `words` table. */
+export interface WordRow {
+  id: number;
+  expression: string;
+  reading: string;
+  meanings_en: string;
+  jlpt_new: number;
+  source_guid: string | null;
+}
+
+/** Decoded JLPT vocab entry with meaning array parsed. */
+export interface Word {
+  id: number;
+  expression: string;
+  reading: string;
+  meaningsEn: string[];
+  jlptNew: JlptNewLevel;
+  sourceGuid: string | null;
+}
+
+export function decodeWord(row: WordRow): Word {
+  return {
+    id: row.id,
+    expression: row.expression,
+    reading: row.reading,
+    meaningsEn: JSON.parse(row.meanings_en) as string[],
+    jlptNew: row.jlpt_new as JlptNewLevel,
+    sourceGuid: row.source_guid,
+  };
+}
+
 export function decodeKanji(row: KanjiRow): Kanji {
   return {
     character: row.character,
