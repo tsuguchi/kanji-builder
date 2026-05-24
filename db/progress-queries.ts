@@ -5,6 +5,7 @@ import {
   type ActivityStats,
   type KanjiProgress,
   type SrsStage,
+  type WordProgress,
 } from '@/db/progress-types';
 
 interface ProgressRow {
@@ -153,6 +154,118 @@ export async function recordSolve(
 
   return {
     character,
+    srsStage: nextStage,
+    clearedAt,
+    lastReviewedAt: now,
+    nextReviewAt,
+  };
+}
+
+// === Word progress (PR #3a) ===
+//
+// Parallel to the kanji_progress helpers above, but indexed by `word_id`
+// (the bundled DB's words.id) rather than character. Source guid is stored
+// alongside as a forward-compat key for future bundle rebuilds. Reviews-
+// screen and Activity-stats integration happen in PR #3b.
+
+interface WordProgressRow {
+  wordId: number;
+  sourceGuid: string | null;
+  srsStage: number;
+  clearedAt: number;
+  lastReviewedAt: number;
+  nextReviewAt: number;
+}
+
+function decodeWordProgress(row: WordProgressRow): WordProgress {
+  return {
+    wordId: row.wordId,
+    sourceGuid: row.sourceGuid,
+    srsStage: row.srsStage as SrsStage,
+    clearedAt: row.clearedAt,
+    lastReviewedAt: row.lastReviewedAt,
+    nextReviewAt: row.nextReviewAt,
+  };
+}
+
+/** Single word lookup. Null if the user hasn't cleared this word yet. */
+export async function getWordProgressFor(
+  db: SQLiteDatabase,
+  wordId: number,
+): Promise<WordProgress | null> {
+  const row = await db.getFirstAsync<WordProgressRow>(
+    `SELECT word_id           AS wordId,
+            source_guid       AS sourceGuid,
+            srs_stage         AS srsStage,
+            cleared_at        AS clearedAt,
+            last_reviewed_at  AS lastReviewedAt,
+            next_review_at    AS nextReviewAt
+       FROM word_progress
+      WHERE word_id = ?`,
+    [wordId],
+  );
+  return row ? decodeWordProgress(row) : null;
+}
+
+/** All cleared words with their SRS state. Used to mark Stage detail Words rows. */
+export async function getAllWordProgress(db: SQLiteDatabase): Promise<WordProgress[]> {
+  const rows = await db.getAllAsync<WordProgressRow>(
+    `SELECT word_id           AS wordId,
+            source_guid       AS sourceGuid,
+            srs_stage         AS srsStage,
+            cleared_at        AS clearedAt,
+            last_reviewed_at  AS lastReviewedAt,
+            next_review_at    AS nextReviewAt
+       FROM word_progress`,
+  );
+  return rows.map(decodeWordProgress);
+}
+
+/**
+ * Record a solve attempt for a vocab word. Stage transition rules mirror
+ * `recordSolve` for kanji (no penalty on first introduction, +1 on clean,
+ * -1 on mistake, capped 1..8). Kept as a separate function instead of
+ * generic to keep the column names (`word_id` vs `character`) and the
+ * `source_guid` write explicit at the call site.
+ */
+export async function recordWordSolve(
+  db: SQLiteDatabase,
+  wordId: number,
+  sourceGuid: string | null,
+  options: { hadMistake: boolean },
+  now: number = Date.now(),
+): Promise<WordProgress> {
+  const existing = await getWordProgressFor(db, wordId);
+  const currentStage = existing?.srsStage ?? 0;
+
+  let nextStage: SrsStage;
+  if (currentStage === 0) {
+    nextStage = 1;
+  } else if (options.hadMistake) {
+    nextStage = Math.max(1, currentStage - 1) as SrsStage;
+  } else {
+    nextStage = Math.min(currentStage + 1, 8) as SrsStage;
+  }
+
+  const interval = SRS_STAGE_INTERVALS_MS[nextStage - 1];
+  const clearedAt = existing?.clearedAt ?? now;
+  const nextReviewAt = now + interval;
+
+  await db.runAsync(
+    `INSERT INTO word_progress
+       (word_id, source_guid, srs_stage, cleared_at, last_reviewed_at, next_review_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(word_id) DO UPDATE SET
+       source_guid       = excluded.source_guid,
+       srs_stage         = excluded.srs_stage,
+       last_reviewed_at  = excluded.last_reviewed_at,
+       next_review_at    = excluded.next_review_at`,
+    [wordId, sourceGuid, nextStage, clearedAt, now, nextReviewAt],
+  );
+
+  return {
+    wordId,
+    sourceGuid,
     srsStage: nextStage,
     clearedAt,
     lastReviewedAt: now,

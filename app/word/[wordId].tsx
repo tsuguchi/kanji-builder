@@ -6,6 +6,9 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { WordBuildSection } from '@/components/game/word-build-section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useProgressDb } from '@/db/progress-context';
+import { getWordProgressFor, recordWordSolve } from '@/db/progress-queries';
+import { SRS_STAGE_LABELS, type WordProgress } from '@/db/progress-types';
 import { getDistractorKanji, getKanjiSequenceForWord, getWordById } from '@/db/queries';
 import type { Word } from '@/db/types';
 
@@ -20,7 +23,9 @@ interface WordStageData {
 export default function WordStageScreen() {
   const { wordId } = useLocalSearchParams<{ wordId: string }>();
   const db = useSQLiteContext();
+  const progressDb = useProgressDb();
   const [data, setData] = useState<WordStageData | null>(null);
+  const [progress, setProgress] = useState<WordProgress | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,14 +45,13 @@ export default function WordStageScreen() {
           return;
         }
         const kanjiSequence = await getKanjiSequenceForWord(db, word.id);
-        const distractors = await getDistractorKanji(
-          db,
-          word.jlptNew,
-          kanjiSequence,
-          DISTRACTOR_COUNT,
-        );
+        const [distractors, existingProgress] = await Promise.all([
+          getDistractorKanji(db, word.jlptNew, kanjiSequence, DISTRACTOR_COUNT),
+          getWordProgressFor(progressDb, word.id),
+        ]);
         if (!cancelled) {
           setData({ word, kanjiSequence, distractors });
+          setProgress(existingProgress);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -56,7 +60,22 @@ export default function WordStageScreen() {
     return () => {
       cancelled = true;
     };
-  }, [db, parsedId]);
+  }, [db, progressDb, parsedId]);
+
+  const handleFirstSolve = async (result: { hadMistake: boolean }) => {
+    if (!data) return;
+    try {
+      const newProgress = await recordWordSolve(
+        progressDb,
+        data.word.id,
+        data.word.sourceGuid,
+        result,
+      );
+      setProgress(newProgress);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   if (error) {
     return (
@@ -103,10 +122,42 @@ export default function WordStageScreen() {
           </ThemedText>
         </View>
 
-        <WordBuildSection word={word} kanjiSequence={kanjiSequence} distractorChars={distractors} />
+        {progress && <WordProgressSummary progress={progress} />}
+
+        <WordBuildSection
+          word={word}
+          kanjiSequence={kanjiSequence}
+          distractorChars={distractors}
+          onFirstSolve={handleFirstSolve}
+        />
       </ScrollView>
     </ThemedView>
   );
+}
+
+function WordProgressSummary({ progress }: { progress: WordProgress }) {
+  const now = Date.now();
+  const isDue = progress.nextReviewAt <= now;
+  const dueIn = formatRelative(progress.nextReviewAt - now);
+  return (
+    <View style={styles.progressBox}>
+      <ThemedText type="defaultSemiBold" style={styles.progressStage}>
+        {SRS_STAGE_LABELS[progress.srsStage]} (stage {progress.srsStage}/8)
+      </ThemedText>
+      <ThemedText style={styles.progressMeta}>
+        {isDue ? `Review due (was scheduled ${dueIn})` : `Next review in ${dueIn}`}
+      </ThemedText>
+    </View>
+  );
+}
+
+function formatRelative(deltaMs: number): string {
+  const abs = Math.abs(deltaMs);
+  const hour = 60 * 60 * 1000;
+  const day = 24 * hour;
+  if (abs < hour) return `${Math.max(1, Math.round(abs / (60 * 1000)))}m`;
+  if (abs < day) return `${Math.round(abs / hour)}h`;
+  return `${Math.round(abs / day)}d`;
 }
 
 const styles = StyleSheet.create({
@@ -136,5 +187,15 @@ const styles = StyleSheet.create({
   metaAll: {
     fontSize: 13,
     opacity: 0.7,
+  },
+  progressBox: {
+    gap: 4,
+  },
+  progressStage: {
+    fontSize: 16,
+  },
+  progressMeta: {
+    opacity: 0.6,
+    fontSize: 13,
   },
 });

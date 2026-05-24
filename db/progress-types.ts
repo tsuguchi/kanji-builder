@@ -45,6 +45,24 @@ export interface KanjiProgress {
   nextReviewAt: number;
 }
 
+export interface WordProgress {
+  wordId: number;
+  /**
+   * Anki-source guid carried over from `words.source_guid`. Stored so that a
+   * future rebuild of the bundled DB (which assigns fresh AUTOINCREMENT word
+   * ids) can re-bind progress rows to their words via this stable key. Not
+   * referenced by any query in this PR — it's a forward-compat hook.
+   */
+  sourceGuid: string | null;
+  srsStage: SrsStage;
+  /** epoch ms — when the user first cleared this word */
+  clearedAt: number;
+  /** epoch ms — most recent successful solve */
+  lastReviewedAt: number;
+  /** epoch ms — when this word becomes eligible for review again */
+  nextReviewAt: number;
+}
+
 /** Per-day activity statistics summarising the `activity_log` table. */
 export interface ActivityStats {
   /** Distinct kanji solved at least once today (local day boundary). */
@@ -78,4 +96,19 @@ export const PROGRESS_SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS idx_activity_at ON activity_log(at);
   CREATE INDEX IF NOT EXISTS idx_activity_character ON activity_log(character);
+
+  -- Vocab word SRS, parallel to kanji_progress. word_id is the AUTOINCREMENT
+  -- id in the bundled DB's words table; source_guid is the anki-deck guid
+  -- (stable across bundle rebuilds), kept so a future migration can re-bind
+  -- progress to renumbered words. activity_log integration lives in a later
+  -- PR (#3b) along with Reviews / stats wiring.
+  CREATE TABLE IF NOT EXISTS word_progress (
+    word_id           INTEGER PRIMARY KEY,
+    source_guid       TEXT,
+    srs_stage         INTEGER NOT NULL CHECK (srs_stage BETWEEN 1 AND 8),
+    cleared_at        INTEGER NOT NULL,
+    last_reviewed_at  INTEGER NOT NULL,
+    next_review_at    INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_word_progress_next_review ON word_progress(next_review_at);
 `;

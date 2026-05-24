@@ -1,6 +1,6 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BuildSection } from '@/components/game/build-section';
@@ -9,8 +9,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
-import { getDueProgress, getProgressFor, recordSolve } from '@/db/progress-queries';
-import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
+import {
+  getAllWordProgress,
+  getDueProgress,
+  getProgressFor,
+  recordSolve,
+} from '@/db/progress-queries';
+import { SRS_STAGE_LABELS, type KanjiProgress, type WordProgress } from '@/db/progress-types';
 import {
   getDistractorRadicals,
   getKanjiByCharacter,
@@ -35,6 +40,7 @@ export default function StageDetailScreen() {
   const session = useReviewSession();
   const [data, setData] = useState<StageData | null>(null);
   const [progress, setProgress] = useState<KanjiProgress | null>(null);
+  const [wordProgress, setWordProgress] = useState<Map<number, WordProgress>>(new Map());
   const [nextDueCharacter, setNextDueCharacter] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +57,7 @@ export default function StageDetailScreen() {
         }
         const radicals = await getRadicalsForKanji(db, character);
         const level = kanji.jlptNew ?? 5;
-        const [distractors, words, existingProgress] = await Promise.all([
+        const [distractors, words, existingProgress, allWordProg] = await Promise.all([
           getDistractorRadicals(
             db,
             level,
@@ -60,10 +66,12 @@ export default function StageDetailScreen() {
           ),
           getWordsForKanji(db, character),
           getProgressFor(progressDb, character),
+          getAllWordProgress(progressDb),
         ]);
         if (!cancelled) {
           setData({ kanji, radicals, distractors, words });
           setProgress(existingProgress);
+          setWordProgress(new Map(allWordProg.map((p) => [p.wordId, p])));
           // Clear stale next-due nudge from the previous stage; it will be
           // recomputed when the user solves this one.
           setNextDueCharacter(null);
@@ -76,6 +84,35 @@ export default function StageDetailScreen() {
       cancelled = true;
     };
   }, [db, progressDb, character]);
+
+  // Word progress can change while the user is on a word puzzle screen (they
+  // solved a word, then hit Back). Re-fetch on every focus so the ✓ / Due
+  // markers on Word rows stay current without a manual reload. Kanji
+  // progress is also refreshed for symmetry — a solved kanji from a chained
+  // review burst should reflect immediately.
+  useFocusEffect(
+    useCallback(() => {
+      if (!character) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const [kanjiProg, allWordProg] = await Promise.all([
+            getProgressFor(progressDb, character),
+            getAllWordProgress(progressDb),
+          ]);
+          if (!cancelled) {
+            setProgress(kanjiProg);
+            setWordProgress(new Map(allWordProg.map((p) => [p.wordId, p])));
+          }
+        } catch (e) {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [progressDb, character]),
+  );
 
   const handleFirstSolve = async (result: { hadMistake: boolean }) => {
     if (!character) return;
@@ -184,7 +221,7 @@ export default function StageDetailScreen() {
           ) : (
             <View style={styles.wordList}>
               {words.map((w) => (
-                <WordRow key={w.id} word={w} />
+                <WordRow key={w.id} word={w} progress={wordProgress.get(w.id)} />
               ))}
             </View>
           )}
@@ -267,10 +304,13 @@ function RadicalChip({ radical }: { radical: RadicalDecomposition }) {
   );
 }
 
-function WordRow({ word }: { word: Word }) {
+function WordRow({ word, progress }: { word: Word; progress?: WordProgress }) {
   // Cap meaning preview to keep rows compact; full meaning list is shown
   // on the word puzzle screen itself.
   const meaning = word.meaningsEn.slice(0, 2).join('; ') || '—';
+  const now = Date.now();
+  const isCleared = progress !== undefined;
+  const isDue = progress !== undefined && progress.nextReviewAt <= now;
   return (
     <LinkButton
       href={`/word/${word.id}`}
@@ -284,8 +324,16 @@ function WordRow({ word }: { word: Word }) {
       <ThemedText style={styles.wordMeaning} numberOfLines={2}>
         {meaning}
       </ThemedText>
-      <View style={styles.wordLevelBadge}>
-        <ThemedText style={styles.wordLevelText}>N{word.jlptNew}</ThemedText>
+      <View style={styles.wordBadges}>
+        {isDue && (
+          <View style={styles.dueBadge}>
+            <ThemedText style={styles.dueBadgeText}>Due</ThemedText>
+          </View>
+        )}
+        {isCleared && <ThemedText style={styles.checkMark}>✓</ThemedText>}
+        <View style={styles.wordLevelBadge}>
+          <ThemedText style={styles.wordLevelText}>N{word.jlptNew}</ThemedText>
+        </View>
       </View>
     </LinkButton>
   );
@@ -428,5 +476,25 @@ const styles = StyleSheet.create({
   wordLevelText: {
     fontSize: 11,
     opacity: 0.6,
+  },
+  wordBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#c66',
+  },
+  dueBadgeText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  checkMark: {
+    fontSize: 20,
+    color: '#3a9d3a',
   },
 });
