@@ -53,6 +53,7 @@ export default function RootLayout() {
                   <Stack.Screen name="stage/[character]" options={{ title: '' }} />
                   <Stack.Screen name="word/[wordId]" options={{ title: '' }} />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="settings" options={{ title: 'Settings' }} />
                 </Stack>
                 <StatusBar style="auto" />
               </ThemeProvider>
