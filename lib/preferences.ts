@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LEVEL_KEY = 'pref:selected-jlpt-level';
+const ONBOARDING_KEY = 'pref:has-seen-onboarding';
 const VALID_LEVELS = new Set([1, 2, 3, 4, 5]);
 export const DEFAULT_LEVEL = 5;
 export const ALL_LEVELS: readonly number[] = [5, 4, 3, 2, 1];
@@ -31,5 +32,33 @@ export async function setSelectedLevel(level: number): Promise<void> {
   } catch {
     // AsyncStorage write failures aren't worth surfacing — the worst case
     // is the next launch falls back to DEFAULT_LEVEL, which is harmless.
+  }
+}
+
+/**
+ * Has the user already seen the first-launch onboarding flow?
+ *
+ * On any error (corrupted storage, missing key, unparseable value) we
+ * return `true` so the user is NOT shown onboarding again. Falling back
+ * to "skip onboarding" is the safer failure mode — surfacing an
+ * onboarding flow to a returning user is more disruptive than missing
+ * it on the rare first-launch edge case.
+ */
+export async function hasSeenOnboarding(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(ONBOARDING_KEY);
+    return raw === '1';
+  } catch {
+    return true;
+  }
+}
+
+/** Mark onboarding as seen so the user isn't shown the flow again. */
+export async function setSeenOnboarding(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ONBOARDING_KEY, '1');
+  } catch {
+    // Same rationale as setSelectedLevel: a missed write at worst shows
+    // onboarding once more next launch, which is harmless.
   }
 }
