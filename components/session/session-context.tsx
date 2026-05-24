@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 
 /**
  * Ephemeral review-session log. Records each `onFirstSolve` event from a
- * stage detail screen so the Reviews screen can summarise the burst of
+ * stage / word screen so the Reviews screen can summarise the burst of
  * solves as a "Session complete!" panel.
  *
  * In-memory only — resets on app restart and on explicit dismiss. Not
@@ -16,15 +16,14 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
  * acknowledged the summary (or when explicitly starting a fresh session).
  */
 
-export interface SessionSolve {
-  character: string;
-  hadMistake: boolean;
-  at: number;
-}
+export type SessionSolve =
+  | { kind: 'kanji'; character: string; hadMistake: boolean; at: number }
+  | { kind: 'word'; wordId: number; hadMistake: boolean; at: number };
 
 interface SessionContextValue {
   solves: SessionSolve[];
-  recordSolve: (character: string, hadMistake: boolean) => void;
+  recordKanjiSolve: (character: string, hadMistake: boolean) => void;
+  recordWordSolve: (wordId: number, hadMistake: boolean) => void;
   dismiss: () => void;
 }
 
@@ -33,15 +32,22 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [solves, setSolves] = useState<SessionSolve[]>([]);
 
-  const recordSolve = useCallback((character: string, hadMistake: boolean) => {
-    setSolves((prev) => [...prev, { character, hadMistake, at: Date.now() }]);
+  const recordKanjiSolve = useCallback((character: string, hadMistake: boolean) => {
+    setSolves((prev) => [...prev, { kind: 'kanji', character, hadMistake, at: Date.now() }]);
+  }, []);
+
+  const recordWordSolve = useCallback((wordId: number, hadMistake: boolean) => {
+    setSolves((prev) => [...prev, { kind: 'word', wordId, hadMistake, at: Date.now() }]);
   }, []);
 
   const dismiss = useCallback(() => {
     setSolves([]);
   }, []);
 
-  const value = useMemo(() => ({ solves, recordSolve, dismiss }), [solves, recordSolve, dismiss]);
+  const value = useMemo(
+    () => ({ solves, recordKanjiSolve, recordWordSolve, dismiss }),
+    [solves, recordKanjiSolve, recordWordSolve, dismiss],
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

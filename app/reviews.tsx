@@ -8,14 +8,22 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
-import { getDueProgress, getNextUpcomingReviewAt } from '@/db/progress-queries';
-import { SRS_STAGE_LABELS, type KanjiProgress } from '@/db/progress-types';
-import { getKanjiByCharacters } from '@/db/queries';
-import type { Kanji } from '@/db/types';
+import {
+  getDueProgress,
+  getDueWordProgress,
+  getNextUpcomingReviewAt,
+  getNextUpcomingWordReviewAt,
+} from '@/db/progress-queries';
+import { SRS_STAGE_LABELS, type KanjiProgress, type WordProgress } from '@/db/progress-types';
+import { getKanjiByCharacters, getWordById } from '@/db/queries';
+import type { Kanji, Word } from '@/db/types';
 
-interface ReviewItem {
-  kanji: Kanji;
-  progress: KanjiProgress;
+type ReviewItem =
+  | { type: 'kanji'; kanji: Kanji; progress: KanjiProgress; nextReviewAt: number }
+  | { type: 'word'; word: Word; progress: WordProgress; nextReviewAt: number };
+
+function itemKey(item: ReviewItem): string {
+  return item.type === 'kanji' ? `k:${item.kanji.character}` : `w:${item.word.id}`;
 }
 
 export default function ReviewsScreen() {
@@ -30,18 +38,51 @@ export default function ReviewsScreen() {
       let cancelled = false;
       (async () => {
         try {
-          const due = await getDueProgress(progressDb);
-          const kanji = await getKanjiByCharacters(
-            kanjiDb,
-            due.map((p) => p.character),
+          const [dueKanji, dueWords, upcomingKanji, upcomingWord] = await Promise.all([
+            getDueProgress(progressDb),
+            getDueWordProgress(progressDb),
+            getNextUpcomingReviewAt(progressDb),
+            getNextUpcomingWordReviewAt(progressDb),
+          ]);
+
+          // Resolve bundled metadata for both kinds in parallel. Words are
+          // fetched one-by-one (no bulk getter yet — small N because only
+          // currently-due rows are involved), kanji uses the existing bulk
+          // helper.
+          const [kanjiRows, wordRows] = await Promise.all([
+            getKanjiByCharacters(
+              kanjiDb,
+              dueKanji.map((p) => p.character),
+            ),
+            Promise.all(dueWords.map((p) => getWordById(kanjiDb, p.wordId))),
+          ]);
+
+          const kanjiByChar = new Map(kanjiRows.map((k) => [k.character, k]));
+          const wordById = new Map(
+            wordRows.filter((w): w is Word => w !== null).map((w) => [w.id, w]),
           );
-          const progressByChar = new Map(due.map((p) => [p.character, p]));
-          const merged: ReviewItem[] = kanji.map((k) => ({
-            kanji: k,
-            // Always defined because we fetched by these exact characters.
-            progress: progressByChar.get(k.character)!,
-          }));
-          const upcoming = await getNextUpcomingReviewAt(progressDb);
+
+          const kanjiItems: ReviewItem[] = dueKanji.flatMap((p) => {
+            const kanji = kanjiByChar.get(p.character);
+            return kanji
+              ? [{ type: 'kanji', kanji, progress: p, nextReviewAt: p.nextReviewAt }]
+              : [];
+          });
+          const wordItems: ReviewItem[] = dueWords.flatMap((p) => {
+            const word = wordById.get(p.wordId);
+            return word ? [{ type: 'word', word, progress: p, nextReviewAt: p.nextReviewAt }] : [];
+          });
+          const merged = [...kanjiItems, ...wordItems].sort(
+            (a, b) => a.nextReviewAt - b.nextReviewAt,
+          );
+
+          // Earliest upcoming review across both kinds, for the empty-state
+          // "Next review in …" hint.
+          const upcoming =
+            upcomingKanji !== null && upcomingWord !== null
+              ? Math.min(upcomingKanji, upcomingWord)
+              : (upcomingKanji ?? upcomingWord);
+
           if (!cancelled) {
             setItems(merged);
             setNextUpcoming(upcoming);
@@ -85,16 +126,21 @@ export default function ReviewsScreen() {
       </View>
       <FlatList
         data={items}
-        keyExtractor={(item) => item.kanji.character}
+        keyExtractor={itemKey}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => <ReviewRow item={item} />}
+        renderItem={({ item }) =>
+          item.type === 'kanji' ? (
+            <KanjiReviewRow kanji={item.kanji} progress={item.progress} />
+          ) : (
+            <WordReviewRow word={item.word} progress={item.progress} />
+          )
+        }
       />
     </ThemedView>
   );
 }
 
-function ReviewRow({ item }: { item: ReviewItem }) {
-  const { kanji, progress } = item;
+function KanjiReviewRow({ kanji, progress }: { kanji: Kanji; progress: KanjiProgress }) {
   const overdueMs = Date.now() - progress.nextReviewAt;
   return (
     <LinkButton
@@ -106,6 +152,27 @@ function ReviewRow({ item }: { item: ReviewItem }) {
       <View style={styles.rowBody}>
         <ThemedText type="defaultSemiBold">
           {kanji.meaningsEn.slice(0, 3).join(', ') || '—'}
+        </ThemedText>
+        <ThemedText style={styles.meta}>
+          {SRS_STAGE_LABELS[progress.srsStage]} · due {formatDelta(overdueMs)} ago
+        </ThemedText>
+      </View>
+      <ThemedText style={styles.chevron}>›</ThemedText>
+    </LinkButton>
+  );
+}
+
+function WordReviewRow({ word, progress }: { word: Word; progress: WordProgress }) {
+  const overdueMs = Date.now() - progress.nextReviewAt;
+  return (
+    <LinkButton href={`/word/${word.id}`} outerStyle={styles.rowOuter} innerStyle={styles.row}>
+      <View style={styles.wordExprBox}>
+        <ThemedText style={styles.wordExpr}>{word.expression}</ThemedText>
+        <ThemedText style={styles.wordReading}>{word.reading}</ThemedText>
+      </View>
+      <View style={styles.rowBody}>
+        <ThemedText type="defaultSemiBold" numberOfLines={1}>
+          {word.meaningsEn.slice(0, 2).join('; ') || '—'}
         </ThemedText>
         <ThemedText style={styles.meta}>
           {SRS_STAGE_LABELS[progress.srsStage]} · due {formatDelta(overdueMs)} ago
@@ -227,6 +294,18 @@ const styles = StyleSheet.create({
     lineHeight: 48,
     width: 56,
     textAlign: 'center',
+  },
+  wordExprBox: {
+    width: 80,
+    gap: 1,
+  },
+  wordExpr: {
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  wordReading: {
+    fontSize: 11,
+    opacity: 0.6,
   },
   rowBody: {
     flex: 1,

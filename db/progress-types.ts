@@ -63,13 +63,16 @@ export interface WordProgress {
   nextReviewAt: number;
 }
 
-/** Per-day activity statistics summarising the `activity_log` table. */
+/** Per-day activity statistics summarising the activity_log tables. */
 export interface ActivityStats {
   /** Distinct kanji solved at least once today (local day boundary). */
-  todayCount: number;
+  todayKanjiCount: number;
+  /** Distinct words solved at least once today (local day boundary). */
+  todayWordCount: number;
   /**
    * Consecutive local-day count ending today, inclusive. 0 when today has
-   * no activity. Skipping a day (or starting fresh) resets to 0 / 1.
+   * no activity. A day with EITHER a kanji solve OR a word solve counts —
+   * the streak doesn't break if the user only practiced one kind that day.
    */
   streakDays: number;
 }
@@ -111,4 +114,16 @@ export const PROGRESS_SCHEMA = `
     next_review_at    INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_word_progress_next_review ON word_progress(next_review_at);
+
+  -- Per-event word activity log, parallel to activity_log for kanji. Kept in
+  -- a separate table (rather than a polymorphic kind column) so each kind's
+  -- queries stay simple — same thinking as kanji_progress vs word_progress.
+  CREATE TABLE IF NOT EXISTS word_activity_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    word_id      INTEGER NOT NULL,
+    had_mistake  INTEGER NOT NULL,
+    at           INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_word_activity_at ON word_activity_log(at);
+  CREATE INDEX IF NOT EXISTS idx_word_activity_word_id ON word_activity_log(word_id);
 `;

@@ -121,7 +121,7 @@ export default function StageDetailScreen() {
     // the user reached this stage via Stages (not Reviews) — they still
     // earned a solve and the summary will surface if they happen to land
     // on Reviews afterwards with no remaining Due.
-    session.recordSolve(character, result.hadMistake);
+    session.recordKanjiSolve(character, result.hadMistake);
     try {
       const newProgress = await recordSolve(progressDb, character, result);
       setProgress(newProgress);

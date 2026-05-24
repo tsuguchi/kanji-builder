@@ -8,8 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { LevelSegment, type LevelCount } from '@/components/ui/level-segment';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
-import { getActivityStats, getAllProgress } from '@/db/progress-queries';
-import type { ActivityStats, KanjiProgress } from '@/db/progress-types';
+import { getActivityStats, getAllProgress, getAllWordProgress } from '@/db/progress-queries';
+import type { ActivityStats, KanjiProgress, WordProgress } from '@/db/progress-types';
 import { getKanjiByJlptNew } from '@/db/queries';
 import type { Kanji } from '@/db/types';
 import {
@@ -29,7 +29,12 @@ export default function StageSelectionScreen() {
   const [kanjiByLevel, setKanjiByLevel] = useState<Map<number, Kanji[]> | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<number>(DEFAULT_LEVEL);
   const [progress, setProgress] = useState<Map<string, KanjiProgress>>(new Map());
-  const [activity, setActivity] = useState<ActivityStats>({ todayCount: 0, streakDays: 0 });
+  const [wordProgress, setWordProgress] = useState<WordProgress[]>([]);
+  const [activity, setActivity] = useState<ActivityStats>({
+    todayKanjiCount: 0,
+    todayWordCount: 0,
+    streakDays: 0,
+  });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,14 +53,16 @@ export default function StageSelectionScreen() {
       let cancelled = false;
       (async () => {
         try {
-          const [perLevel, allProgress, stats] = await Promise.all([
+          const [perLevel, allProgress, allWordProg, stats] = await Promise.all([
             Promise.all(ALL_LEVELS.map((lv) => getKanjiByJlptNew(db, lv))),
             getAllProgress(progressDb),
+            getAllWordProgress(progressDb),
             getActivityStats(progressDb),
           ]);
           if (!cancelled) {
             setKanjiByLevel(new Map(ALL_LEVELS.map((lv, i) => [lv, perLevel[i]])));
             setProgress(new Map(allProgress.map((p) => [p.character, p])));
+            setWordProgress(allWordProg);
             setActivity(stats);
           }
         } catch (e) {
@@ -107,9 +114,12 @@ export default function StageSelectionScreen() {
   // dueCount is intentionally global (not filtered to selectedLevel) — the
   // Reviews screen itself is level-agnostic, so the CTA should reflect every
   // pending review regardless of which tab the user is currently browsing.
-  const dueCount = Array.from(progress.values()).filter((p) => p.nextReviewAt <= now).length;
+  // Includes both kanji and word due — they show up in the same Reviews feed.
+  const kanjiDueCount = Array.from(progress.values()).filter((p) => p.nextReviewAt <= now).length;
+  const wordDueCount = wordProgress.filter((p) => p.nextReviewAt <= now).length;
+  const dueCount = kanjiDueCount + wordDueCount;
 
-  const hasActivity = activity.todayCount > 0 || activity.streakDays > 0;
+  const activityLine = formatActivityLine(activity);
 
   return (
     <ThemedView style={styles.container}>
@@ -118,14 +128,7 @@ export default function StageSelectionScreen() {
         <ThemedText type="subtitle">
           {selectedCount?.cleared ?? 0}/{selectedCount?.total ?? stages.length} cleared
         </ThemedText>
-        {hasActivity && (
-          <ThemedText style={styles.activityLine}>
-            {activity.todayCount > 0 && `${activity.todayCount} today`}
-            {activity.todayCount > 0 && activity.streakDays > 0 && ' · '}
-            {activity.streakDays > 0 &&
-              `${activity.streakDays}-day streak${activity.streakDays >= 7 ? ' 🔥' : ''}`}
-          </ThemedText>
-        )}
+        {activityLine && <ThemedText style={styles.activityLine}>{activityLine}</ThemedText>}
         <LevelSegment
           levels={ALL_LEVELS}
           selected={selectedLevel}
@@ -158,6 +161,27 @@ export default function StageSelectionScreen() {
       />
     </ThemedView>
   );
+}
+
+/**
+ * "5 kanji · 3 words today · 7-day streak" — only the present parts; returns
+ * null if there's nothing to say (fresh install, no activity yet).
+ */
+function formatActivityLine(activity: ActivityStats): string | null {
+  const parts: string[] = [];
+  if (activity.todayKanjiCount > 0) {
+    parts.push(`${activity.todayKanjiCount} kanji`);
+  }
+  if (activity.todayWordCount > 0) {
+    parts.push(`${activity.todayWordCount} word${activity.todayWordCount === 1 ? '' : 's'}`);
+  }
+  let line = parts.length > 0 ? `${parts.join(' · ')} today` : '';
+  if (activity.streakDays > 0) {
+    const fire = activity.streakDays >= 7 ? ' 🔥' : '';
+    const streak = `${activity.streakDays}-day streak${fire}`;
+    line = line ? `${line} · ${streak}` : streak;
+  }
+  return line || null;
 }
 
 function StageRow({
