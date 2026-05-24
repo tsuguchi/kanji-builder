@@ -96,6 +96,59 @@ export async function getRadicalsForKanji(
  * single kanji can appear multiple times in a word (e.g. 日日 — though
  * with position the JOIN can return one row per occurrence).
  */
+/** Single vocab word lookup by `words.id`. Returns null if absent. */
+export async function getWordById(db: SQLiteDatabase, wordId: number): Promise<Word | null> {
+  const row = await db.getFirstAsync<WordRow>(
+    `SELECT id, expression, reading, meanings_en, jlpt_new, source_guid
+       FROM words WHERE id = ?`,
+    [wordId],
+  );
+  return row ? decodeWord(row) : null;
+}
+
+/**
+ * Constituent kanji of a word in `position` order (e.g. "学生" → ["学","生"]).
+ * Used by the word-building puzzle to know the correct answer sequence.
+ * Note `position` indexes only the kanji characters of the expression — any
+ * okurigana / hiragana between them is not part of this sequence (see
+ * scripts/05_parse_jlpt_vocab.py).
+ */
+export async function getKanjiSequenceForWord(
+  db: SQLiteDatabase,
+  wordId: number,
+): Promise<string[]> {
+  const rows = await db.getAllAsync<{ kanjiChar: string }>(
+    `SELECT kanji_char AS kanjiChar FROM word_kanji WHERE word_id = ? ORDER BY position`,
+    [wordId],
+  );
+  return rows.map((r) => r.kanjiChar);
+}
+
+/**
+ * Kanji characters at the given JLPT-new level, excluding any character in
+ * `excludeChars`. Returns up to `count` characters in random order. Used to
+ * populate distractor chips for the word-building puzzle: same-level kanji
+ * the user has plausibly seen but that don't belong in this word.
+ */
+export async function getDistractorKanji(
+  db: SQLiteDatabase,
+  jlptNewLevel: number,
+  excludeChars: readonly string[],
+  count: number,
+): Promise<string[]> {
+  const placeholders = excludeChars.map(() => '?').join(', ');
+  const exclusionClause = excludeChars.length ? `AND character NOT IN (${placeholders})` : '';
+  const rows = await db.getAllAsync<{ character: string }>(
+    `SELECT character FROM kanji
+      WHERE jlpt_new = ?
+        ${exclusionClause}
+      ORDER BY RANDOM()
+      LIMIT ?`,
+    [jlptNewLevel, ...excludeChars, count],
+  );
+  return rows.map((r) => r.character);
+}
+
 export async function getWordsForKanji(db: SQLiteDatabase, kanjiChar: string): Promise<Word[]> {
   const rows = await db.getAllAsync<WordRow>(
     `SELECT DISTINCT w.id, w.expression, w.reading, w.meanings_en, w.jlpt_new, w.source_guid

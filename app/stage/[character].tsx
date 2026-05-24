@@ -268,11 +268,15 @@ function RadicalChip({ radical }: { radical: RadicalDecomposition }) {
 }
 
 function WordRow({ word }: { word: Word }) {
-  // Cap meaning preview to keep rows compact; full meaning list is available
-  // on the (future) word-puzzle screen when the row becomes tappable.
+  // Cap meaning preview to keep rows compact; full meaning list is shown
+  // on the word puzzle screen itself.
   const meaning = word.meaningsEn.slice(0, 2).join('; ') || '—';
   return (
-    <View style={styles.wordRow}>
+    <LinkButton
+      href={`/word/${word.id}`}
+      outerStyle={styles.wordRowOuter}
+      innerStyle={styles.wordRow}
+    >
       <View style={styles.wordExprBox}>
         <ThemedText style={styles.wordExpr}>{word.expression}</ThemedText>
         <ThemedText style={styles.wordReading}>{word.reading}</ThemedText>
@@ -283,7 +287,7 @@ function WordRow({ word }: { word: Word }) {
       <View style={styles.wordLevelBadge}>
         <ThemedText style={styles.wordLevelText}>N{word.jlptNew}</ThemedText>
       </View>
-    </View>
+    </LinkButton>
   );
 }
 
@@ -384,6 +388,12 @@ const styles = StyleSheet.create({
   },
   wordList: {
     gap: 8,
+  },
+  wordRowOuter: {
+    // Border-bottom stays on the outer Pressable so the tap target covers
+    // the full row; padding moves to the inner View per [[feedback-link-aschild-pressable]].
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#8884',
   },
   wordRow: {
     flexDirection: 'row',

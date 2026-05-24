@@ -49,6 +49,7 @@ export default function RootLayout() {
                   <Stack.Screen name="index" options={{ headerShown: false }} />
                   <Stack.Screen name="reviews" options={{ title: 'Reviews' }} />
                   <Stack.Screen name="stage/[character]" options={{ title: '' }} />
+                  <Stack.Screen name="word/[wordId]" options={{ title: '' }} />
                 </Stack>
                 <StatusBar style="auto" />
               </ThemeProvider>
