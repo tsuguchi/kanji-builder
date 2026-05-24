@@ -263,6 +263,14 @@ export async function recordWordSolve(
     [wordId, sourceGuid, nextStage, clearedAt, now, nextReviewAt],
   );
 
+  // Per-event log so daily counts / streak survive independently of the
+  // word_progress upsert (which only retains the latest review per word).
+  await db.runAsync(`INSERT INTO word_activity_log (word_id, had_mistake, at) VALUES (?, ?, ?)`, [
+    wordId,
+    options.hadMistake ? 1 : 0,
+    now,
+  ]);
+
   return {
     wordId,
     sourceGuid,
@@ -273,17 +281,53 @@ export async function recordWordSolve(
   };
 }
 
+/** Word progress rows currently due (`next_review_at <= now`), most-overdue first. */
+export async function getDueWordProgress(
+  db: SQLiteDatabase,
+  now: number = Date.now(),
+): Promise<WordProgress[]> {
+  const rows = await db.getAllAsync<WordProgressRow>(
+    `SELECT word_id           AS wordId,
+            source_guid       AS sourceGuid,
+            srs_stage         AS srsStage,
+            cleared_at        AS clearedAt,
+            last_reviewed_at  AS lastReviewedAt,
+            next_review_at    AS nextReviewAt
+       FROM word_progress
+      WHERE next_review_at <= ?
+      ORDER BY next_review_at ASC`,
+    [now],
+  );
+  return rows.map(decodeWordProgress);
+}
+
+/** Earliest future `next_review_at` for words, or null if none. */
+export async function getNextUpcomingWordReviewAt(
+  db: SQLiteDatabase,
+  now: number = Date.now(),
+): Promise<number | null> {
+  const row = await db.getFirstAsync<{ nextReviewAt: number }>(
+    `SELECT MIN(next_review_at) AS nextReviewAt
+       FROM word_progress
+      WHERE next_review_at > ?`,
+    [now],
+  );
+  return row?.nextReviewAt ?? null;
+}
+
 /**
- * Aggregate activity log entries into per-day stats:
+ * Aggregate activity log entries into per-day stats across both kinds:
  *
- * - `todayCount`: distinct kanji solved at least once today (local-day
- *   boundary, derived from each event's `at` timestamp).
- * - `streakDays`: consecutive local days with at least one event, walking
- *   back from today. 0 if today has no activity yet.
+ * - `todayKanjiCount`: distinct kanji solved at least once today.
+ * - `todayWordCount`: distinct words solved at least once today.
+ * - `streakDays`: consecutive local days with at least one event of EITHER
+ *   kind, walking back from today. A day with only words (or only kanji)
+ *   keeps the streak alive — the goal is "touched the app meaningfully
+ *   today", not "did the same kind of practice every day".
  *
  * Streak uses local time so a user's "day" matches the wall clock they live
- * in. Reading every distinct day key is fine even for years of activity —
- * a few thousand integers at most.
+ * in. Reading every distinct day key from both tables is fine even for
+ * years of activity — a few thousand integers at most.
  */
 export async function getActivityStats(
   db: SQLiteDatabase,
@@ -292,26 +336,33 @@ export async function getActivityStats(
   const todayStart = startOfLocalDay(now);
   const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
 
-  // Distinct kanji solved today (de-dup across multiple solves of the same
-  // character within the day).
-  const todayRow = await db.getFirstAsync<{ count: number }>(
+  const todayKanjiRow = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(DISTINCT character) AS count
        FROM activity_log
       WHERE at >= ? AND at < ?`,
     [todayStart, tomorrowStart],
   );
-  const todayCount = todayRow?.count ?? 0;
+  const todayKanjiCount = todayKanjiRow?.count ?? 0;
 
-  // Collect timestamps of every activity ever; project to local-day keys in
-  // JS. Most projects won't approach the millions of events where this is
-  // wasteful.
+  const todayWordRow = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(DISTINCT word_id) AS count
+       FROM word_activity_log
+      WHERE at >= ? AND at < ?`,
+    [todayStart, tomorrowStart],
+  );
+  const todayWordCount = todayWordRow?.count ?? 0;
+
+  // Union day keys from both logs for the streak. We pull only timestamps,
+  // so a single SQL UNION ALL is cheaper than two round-trips.
   const allRows = await db.getAllAsync<{ at: number }>(
-    `SELECT at FROM activity_log ORDER BY at DESC`,
+    `SELECT at FROM activity_log
+     UNION ALL
+     SELECT at FROM word_activity_log`,
   );
   const dayKeys = new Set(allRows.map((r) => localDayKey(r.at)));
   const streakDays = computeStreakDays(dayKeys, now);
 
-  return { todayCount, streakDays };
+  return { todayKanjiCount, todayWordCount, streakDays };
 }
 
 /** Local-day boundary (00:00 local time of `now`'s day) in epoch ms. */

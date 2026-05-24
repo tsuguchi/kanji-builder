@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { WordBuildSection } from '@/components/game/word-build-section';
+import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useProgressDb } from '@/db/progress-context';
@@ -24,6 +25,7 @@ export default function WordStageScreen() {
   const { wordId } = useLocalSearchParams<{ wordId: string }>();
   const db = useSQLiteContext();
   const progressDb = useProgressDb();
+  const session = useReviewSession();
   const [data, setData] = useState<WordStageData | null>(null);
   const [progress, setProgress] = useState<WordProgress | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -64,6 +66,10 @@ export default function WordStageScreen() {
 
   const handleFirstSolve = async (result: { hadMistake: boolean }) => {
     if (!data) return;
+    // Mirror the kanji-side pattern: record into the ephemeral session log
+    // before/in-parallel with persistence, so the Reviews summary surfaces
+    // even if the SRS write somehow errors.
+    session.recordWordSolve(data.word.id, result.hadMistake);
     try {
       const newProgress = await recordWordSolve(
         progressDb,
