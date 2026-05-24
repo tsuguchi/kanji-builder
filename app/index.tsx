@@ -124,7 +124,16 @@ export default function StageSelectionScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText type="title">N{selectedLevel} Stages</ThemedText>
+        <View style={styles.titleRow}>
+          <ThemedText type="title">N{selectedLevel} Stages</ThemedText>
+          <LinkButton
+            href="/settings"
+            outerStyle={styles.settingsButtonOuter}
+            innerStyle={styles.settingsButton}
+          >
+            <ThemedText style={styles.settingsIcon}>⚙</ThemedText>
+          </LinkButton>
+        </View>
         <ThemedText type="subtitle">
           {selectedCount?.cleared ?? 0}/{selectedCount?.total ?? stages.length} cleared
         </ThemedText>
@@ -244,6 +253,23 @@ const styles = StyleSheet.create({
   },
   activityLine: {
     fontSize: 13,
+    opacity: 0.7,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingsButtonOuter: {
+    // Pressable scope only — visible frame is on the inner View.
+  },
+  settingsButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  settingsIcon: {
+    fontSize: 22,
     opacity: 0.7,
   },
   reviewsCtaOuter: {

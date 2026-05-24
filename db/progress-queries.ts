@@ -66,6 +66,30 @@ export async function getNextUpcomingReviewAt(
   return row?.nextReviewAt ?? null;
 }
 
+/**
+ * Wipe every user-progress row from progress.sqlite:
+ *
+ *   - kanji_progress
+ *   - word_progress
+ *   - activity_log
+ *   - word_activity_log
+ *
+ * Used by the Settings "Reset all progress" action. Schema (CREATE TABLE
+ * IF NOT EXISTS) stays in place — only rows are deleted, so subsequent
+ * solves write into the same tables as before.
+ *
+ * Runs in a single transaction so a partial wipe (e.g. kanji cleared but
+ * not words) can't leave the user in a weird half-reset state.
+ */
+export async function resetAllProgress(db: SQLiteDatabase): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM kanji_progress');
+    await db.runAsync('DELETE FROM word_progress');
+    await db.runAsync('DELETE FROM activity_log');
+    await db.runAsync('DELETE FROM word_activity_log');
+  });
+}
+
 /** All cleared kanji with their SRS state. Empty array = no clears yet. */
 export async function getAllProgress(db: SQLiteDatabase): Promise<KanjiProgress[]> {
   const rows = await db.getAllAsync<ProgressRow>(
