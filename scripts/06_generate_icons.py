@@ -45,9 +45,9 @@ WHITE = (255, 255, 255)
 
 # Try a few common Windows JP fonts in preference order.
 FONT_CANDIDATES = [
-    "C:/Windows/Fonts/YuGothB.ttc",   # Yu Gothic Bold
-    "C:/Windows/Fonts/meiryob.ttc",   # Meiryo Bold
-    "C:/Windows/Fonts/YuGothM.ttc",   # Yu Gothic Medium
+    "C:/Windows/Fonts/YuGothB.ttc",  # Yu Gothic Bold
+    "C:/Windows/Fonts/meiryob.ttc",  # Meiryo Bold
+    "C:/Windows/Fonts/YuGothM.ttc",  # Yu Gothic Medium
     "C:/Windows/Fonts/msgothic.ttc",  # MS Gothic
 ]
 
@@ -59,8 +59,7 @@ def load_font(size: int) -> ImageFont.FreeTypeFont:
         except OSError:
             continue
     raise FileNotFoundError(
-        "No usable JP font found. Install Yu Gothic / Meiryo / MS Gothic, "
-        "or extend FONT_CANDIDATES in this script."
+        "No usable JP font found. Install Yu Gothic / Meiryo / MS Gothic, or extend FONT_CANDIDATES in this script."
     )
 
 
