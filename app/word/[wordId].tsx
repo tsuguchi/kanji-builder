@@ -1,12 +1,13 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { WordBuildSection } from '@/components/game/word-build-section';
 import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ErrorView } from '@/components/ui/error-view';
 import { useProgressDb } from '@/db/progress-context';
 import { getWordProgressFor, recordWordSolve } from '@/db/progress-queries';
 import { SRS_STAGE_LABELS, type WordProgress } from '@/db/progress-types';
@@ -33,17 +34,18 @@ export default function WordStageScreen() {
 
   const parsedId = wordId ? Number.parseInt(wordId, 10) : Number.NaN;
 
-  useEffect(() => {
-    if (!Number.isFinite(parsedId)) {
-      setNotFound(true);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
+  const loadWord = useCallback(
+    async (signal: { cancelled: boolean }) => {
+      if (!Number.isFinite(parsedId)) {
+        setNotFound(true);
+        return;
+      }
+      setError(null);
+      setNotFound(false);
       try {
         const word = await getWordById(db, parsedId);
         if (!word) {
-          if (!cancelled) setNotFound(true);
+          if (!signal.cancelled) setNotFound(true);
           return;
         }
         const kanjiSequence = await getKanjiSequenceForWord(db, word.id);
@@ -51,18 +53,29 @@ export default function WordStageScreen() {
           getDistractorKanji(db, word.jlptNew, kanjiSequence, DISTRACTOR_COUNT),
           getWordProgressFor(progressDb, word.id),
         ]);
-        if (!cancelled) {
+        if (!signal.cancelled) {
           setData({ word, kanjiSequence, distractors });
           setProgress(existingProgress);
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!signal.cancelled) setError(e instanceof Error ? e.message : String(e));
       }
-    })();
+    },
+    [db, progressDb, parsedId],
+  );
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void loadWord(signal);
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
-  }, [db, progressDb, parsedId]);
+  }, [loadWord]);
+
+  const retryLoad = useCallback(() => {
+    setData(null);
+    void loadWord({ cancelled: false });
+  }, [loadWord]);
 
   const handleFirstSolve = async (result: { hadMistake: boolean }) => {
     if (!data) return;
@@ -85,21 +98,28 @@ export default function WordStageScreen() {
 
   if (error) {
     return (
-      <ThemedView style={styles.centered}>
+      <>
         <Stack.Screen options={{ title: 'Word' }} />
-        <ThemedText type="subtitle">DB error</ThemedText>
-        <ThemedText>{error}</ThemedText>
-      </ThemedView>
+        <ErrorView
+          title="Something went wrong"
+          message="We couldn't load this word. The bundled database may be in an unexpected state."
+          rawError={error}
+          onRetry={retryLoad}
+        />
+      </>
     );
   }
 
   if (notFound) {
     return (
-      <ThemedView style={styles.centered}>
+      <>
         <Stack.Screen options={{ title: 'Not found' }} />
-        <ThemedText type="subtitle">Word not found</ThemedText>
-        <ThemedText>The word id &quot;{wordId}&quot; is not in the bundled database.</ThemedText>
-      </ThemedView>
+        <ErrorView
+          title="Word not found"
+          message={`The word id "${wordId ?? ''}" isn't in the bundled database.`}
+          glyph="✕"
+        />
+      </>
     );
   }
 
