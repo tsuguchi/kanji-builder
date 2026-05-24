@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ErrorView } from '@/components/ui/error-view';
 import { LevelSegment, type LevelCount } from '@/components/ui/level-segment';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
@@ -48,32 +49,43 @@ export default function StageSelectionScreen() {
     };
   }, []);
 
+  const loadStages = useCallback(
+    async (signal: { cancelled: boolean }) => {
+      setError(null);
+      try {
+        const [perLevel, allProgress, allWordProg, stats] = await Promise.all([
+          Promise.all(ALL_LEVELS.map((lv) => getKanjiByJlptNew(db, lv))),
+          getAllProgress(progressDb),
+          getAllWordProgress(progressDb),
+          getActivityStats(progressDb),
+        ]);
+        if (!signal.cancelled) {
+          setKanjiByLevel(new Map(ALL_LEVELS.map((lv, i) => [lv, perLevel[i]])));
+          setProgress(new Map(allProgress.map((p) => [p.character, p])));
+          setWordProgress(allWordProg);
+          setActivity(stats);
+        }
+      } catch (e) {
+        if (!signal.cancelled) setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [db, progressDb],
+  );
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const [perLevel, allProgress, allWordProg, stats] = await Promise.all([
-            Promise.all(ALL_LEVELS.map((lv) => getKanjiByJlptNew(db, lv))),
-            getAllProgress(progressDb),
-            getAllWordProgress(progressDb),
-            getActivityStats(progressDb),
-          ]);
-          if (!cancelled) {
-            setKanjiByLevel(new Map(ALL_LEVELS.map((lv, i) => [lv, perLevel[i]])));
-            setProgress(new Map(allProgress.map((p) => [p.character, p])));
-            setWordProgress(allWordProg);
-            setActivity(stats);
-          }
-        } catch (e) {
-          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-        }
-      })();
+      const signal = { cancelled: false };
+      void loadStages(signal);
       return () => {
-        cancelled = true;
+        signal.cancelled = true;
       };
-    }, [db, progressDb]),
+    }, [loadStages]),
   );
+
+  const retryLoad = useCallback(() => {
+    setKanjiByLevel(null);
+    void loadStages({ cancelled: false });
+  }, [loadStages]);
 
   const levelCounts = useMemo(() => {
     const map = new Map<number, LevelCount>();
@@ -92,11 +104,16 @@ export default function StageSelectionScreen() {
   }, []);
 
   if (error) {
+    // Stages itself is "home", so the back button isn't useful here — just
+    // a Try again that re-runs the same fetch.
     return (
-      <ThemedView style={styles.centered}>
-        <ThemedText type="subtitle">DB error</ThemedText>
-        <ThemedText>{error}</ThemedText>
-      </ThemedView>
+      <ErrorView
+        title="Something went wrong"
+        message="We couldn't load your stages. Tap Try again to retry the database read."
+        rawError={error}
+        onRetry={retryLoad}
+        hideHome
+      />
     );
   }
 

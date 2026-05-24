@@ -7,6 +7,7 @@ import { BuildSection } from '@/components/game/build-section';
 import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ErrorView } from '@/components/ui/error-view';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import {
@@ -45,14 +46,19 @@ export default function StageDetailScreen() {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!character) return;
-    let cancelled = false;
-    (async () => {
+  // Extracted as useCallback so the ErrorView "Try again" button can re-run
+  // the same fetcher without re-mounting the screen. `cancelled` is owned
+  // by the caller (useEffect's cleanup) — the fetcher itself is fire-and-
+  // forget once invoked.
+  const loadStage = useCallback(
+    async (signal: { cancelled: boolean }) => {
+      if (!character) return;
+      setError(null);
+      setNotFound(false);
       try {
         const kanji = await getKanjiByCharacter(db, character);
         if (!kanji) {
-          if (!cancelled) setNotFound(true);
+          if (!signal.cancelled) setNotFound(true);
           return;
         }
         const radicals = await getRadicalsForKanji(db, character);
@@ -68,7 +74,7 @@ export default function StageDetailScreen() {
           getProgressFor(progressDb, character),
           getAllWordProgress(progressDb),
         ]);
-        if (!cancelled) {
+        if (!signal.cancelled) {
           setData({ kanji, radicals, distractors, words });
           setProgress(existingProgress);
           setWordProgress(new Map(allWordProg.map((p) => [p.wordId, p])));
@@ -77,13 +83,24 @@ export default function StageDetailScreen() {
           setNextDueCharacter(null);
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!signal.cancelled) setError(e instanceof Error ? e.message : String(e));
       }
-    })();
+    },
+    [db, progressDb, character],
+  );
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void loadStage(signal);
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
-  }, [db, progressDb, character]);
+  }, [loadStage]);
+
+  const retryLoad = useCallback(() => {
+    setData(null);
+    void loadStage({ cancelled: false });
+  }, [loadStage]);
 
   // Word progress can change while the user is on a word puzzle screen (they
   // solved a word, then hit Back). Re-fetch on every focus so the ✓ / Due
@@ -141,21 +158,28 @@ export default function StageDetailScreen() {
 
   if (error) {
     return (
-      <ThemedView style={styles.centered}>
+      <>
         <Stack.Screen options={{ title: character ?? 'Stage' }} />
-        <ThemedText type="subtitle">DB error</ThemedText>
-        <ThemedText>{error}</ThemedText>
-      </ThemedView>
+        <ErrorView
+          title="Something went wrong"
+          message="We couldn't load this stage. The bundled database may be in an unexpected state."
+          rawError={error}
+          onRetry={retryLoad}
+        />
+      </>
     );
   }
 
   if (notFound) {
     return (
-      <ThemedView style={styles.centered}>
+      <>
         <Stack.Screen options={{ title: 'Not found' }} />
-        <ThemedText type="subtitle">Stage not found</ThemedText>
-        <ThemedText>The kanji &quot;{character}&quot; is not in the bundled database.</ThemedText>
-      </ThemedView>
+        <ErrorView
+          title="Stage not found"
+          message={`The kanji "${character ?? ''}" isn't in the bundled database.`}
+          glyph="✕"
+        />
+      </>
     );
   }
 

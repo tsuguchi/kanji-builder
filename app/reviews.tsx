@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-
 import { useReviewSession } from '@/components/session/session-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ErrorView } from '@/components/ui/error-view';
 import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import {
@@ -33,76 +34,81 @@ export default function ReviewsScreen() {
   const [nextUpcoming, setNextUpcoming] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const loadReviews = useCallback(
+    async (signal: { cancelled: boolean }) => {
+      setError(null);
+      try {
+        const [dueKanji, dueWords, upcomingKanji, upcomingWord] = await Promise.all([
+          getDueProgress(progressDb),
+          getDueWordProgress(progressDb),
+          getNextUpcomingReviewAt(progressDb),
+          getNextUpcomingWordReviewAt(progressDb),
+        ]);
+
+        const [kanjiRows, wordRows] = await Promise.all([
+          getKanjiByCharacters(
+            kanjiDb,
+            dueKanji.map((p) => p.character),
+          ),
+          Promise.all(dueWords.map((p) => getWordById(kanjiDb, p.wordId))),
+        ]);
+
+        const kanjiByChar = new Map(kanjiRows.map((k) => [k.character, k]));
+        const wordById = new Map(
+          wordRows.filter((w): w is Word => w !== null).map((w) => [w.id, w]),
+        );
+
+        const kanjiItems: ReviewItem[] = dueKanji.flatMap((p) => {
+          const kanji = kanjiByChar.get(p.character);
+          return kanji ? [{ type: 'kanji', kanji, progress: p, nextReviewAt: p.nextReviewAt }] : [];
+        });
+        const wordItems: ReviewItem[] = dueWords.flatMap((p) => {
+          const word = wordById.get(p.wordId);
+          return word ? [{ type: 'word', word, progress: p, nextReviewAt: p.nextReviewAt }] : [];
+        });
+        const merged = [...kanjiItems, ...wordItems].sort(
+          (a, b) => a.nextReviewAt - b.nextReviewAt,
+        );
+
+        const upcoming =
+          upcomingKanji !== null && upcomingWord !== null
+            ? Math.min(upcomingKanji, upcomingWord)
+            : (upcomingKanji ?? upcomingWord);
+
+        if (!signal.cancelled) {
+          setItems(merged);
+          setNextUpcoming(upcoming);
+        }
+      } catch (e) {
+        if (!signal.cancelled) setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [kanjiDb, progressDb],
+  );
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const [dueKanji, dueWords, upcomingKanji, upcomingWord] = await Promise.all([
-            getDueProgress(progressDb),
-            getDueWordProgress(progressDb),
-            getNextUpcomingReviewAt(progressDb),
-            getNextUpcomingWordReviewAt(progressDb),
-          ]);
-
-          // Resolve bundled metadata for both kinds in parallel. Words are
-          // fetched one-by-one (no bulk getter yet — small N because only
-          // currently-due rows are involved), kanji uses the existing bulk
-          // helper.
-          const [kanjiRows, wordRows] = await Promise.all([
-            getKanjiByCharacters(
-              kanjiDb,
-              dueKanji.map((p) => p.character),
-            ),
-            Promise.all(dueWords.map((p) => getWordById(kanjiDb, p.wordId))),
-          ]);
-
-          const kanjiByChar = new Map(kanjiRows.map((k) => [k.character, k]));
-          const wordById = new Map(
-            wordRows.filter((w): w is Word => w !== null).map((w) => [w.id, w]),
-          );
-
-          const kanjiItems: ReviewItem[] = dueKanji.flatMap((p) => {
-            const kanji = kanjiByChar.get(p.character);
-            return kanji
-              ? [{ type: 'kanji', kanji, progress: p, nextReviewAt: p.nextReviewAt }]
-              : [];
-          });
-          const wordItems: ReviewItem[] = dueWords.flatMap((p) => {
-            const word = wordById.get(p.wordId);
-            return word ? [{ type: 'word', word, progress: p, nextReviewAt: p.nextReviewAt }] : [];
-          });
-          const merged = [...kanjiItems, ...wordItems].sort(
-            (a, b) => a.nextReviewAt - b.nextReviewAt,
-          );
-
-          // Earliest upcoming review across both kinds, for the empty-state
-          // "Next review in …" hint.
-          const upcoming =
-            upcomingKanji !== null && upcomingWord !== null
-              ? Math.min(upcomingKanji, upcomingWord)
-              : (upcomingKanji ?? upcomingWord);
-
-          if (!cancelled) {
-            setItems(merged);
-            setNextUpcoming(upcoming);
-          }
-        } catch (e) {
-          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-        }
-      })();
+      const signal = { cancelled: false };
+      void loadReviews(signal);
       return () => {
-        cancelled = true;
+        signal.cancelled = true;
       };
-    }, [kanjiDb, progressDb]),
+    }, [loadReviews]),
   );
+
+  const retryLoad = useCallback(() => {
+    setItems(null);
+    void loadReviews({ cancelled: false });
+  }, [loadReviews]);
 
   if (error) {
     return (
-      <ThemedView style={styles.centered}>
-        <ThemedText type="subtitle">DB error</ThemedText>
-        <ThemedText>{error}</ThemedText>
-      </ThemedView>
+      <ErrorView
+        title="Something went wrong"
+        message="We couldn't load your reviews. Tap Try again or head back to the stages."
+        rawError={error}
+        onRetry={retryLoad}
+      />
     );
   }
 
