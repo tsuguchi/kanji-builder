@@ -14,6 +14,11 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
+# --- Expo web export staging ----------------------------------------
+# `npx expo export --platform web --output-dir dist-web` outputs here.
+# The committed copy lives under docs/app/ (see docs/app/.nojekyll).
+dist-web/
+
 # --- Xcode / Swift ---------------------------------------------------
 ## User settings
 xcuserdata/
