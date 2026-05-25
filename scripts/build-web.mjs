@@ -45,9 +45,13 @@ rmSync(DEST, { recursive: true, force: true });
 mkdirSync(DEST, { recursive: true });
 cpSync(STAGE, DEST, { recursive: true });
 
-// `.nojekyll` tells GitHub Pages to skip Jekyll, so files / directories
-// that start with `_` (e.g. `_expo/`) are served instead of being
-// silently dropped.
-writeFileSync(resolve(DEST, '.nojekyll'), '');
+// `.nojekyll` lives in the docs/ root (the GitHub Pages site root for this
+// repo), NOT in docs/app/. GitHub Pages only honors `.nojekyll` at the
+// site root — placing it deeper has no effect, and Jekyll then drops
+// every `_expo/` directory under the build output (entry .js 404s).
+const NOJEKYLL = resolve(ROOT, 'docs', '.nojekyll');
+if (!existsSync(NOJEKYLL)) {
+  writeFileSync(NOJEKYLL, '');
+}
 
 console.log('build-web: done. Commit docs/app/ and push.');
