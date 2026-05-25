@@ -6,6 +6,12 @@ title: Kanji Builder
 
 A kanji puzzle app for foreign Japanese learners. Build kanji from radicals, then words from kanji.
 
+## Try it in your browser
+
+- [Launch the web app →](./app/)
+
+Drag radicals together to build kanji, then kanji together to build words. Everything is stored locally in your browser — no account, no servers.
+
 ## Legal
 
 - [Terms of Service](./terms)

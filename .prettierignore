@@ -1,6 +1,8 @@
 node_modules/
 .expo/
 dist/
+dist-web/
+docs/app/
 web-build/
 ios/
 android/

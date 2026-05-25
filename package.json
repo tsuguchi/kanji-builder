@@ -13,6 +13,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "web:deploy": "node ./scripts/build-web.mjs",
     "lint": "expo lint",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
