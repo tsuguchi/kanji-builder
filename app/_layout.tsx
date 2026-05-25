@@ -54,6 +54,9 @@ export default function RootLayout() {
                   <Stack.Screen name="word/[wordId]" options={{ title: '' }} />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                   <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+                  <Stack.Screen name="about" options={{ title: 'About' }} />
+                  <Stack.Screen name="about/terms" options={{ title: 'Terms of Service' }} />
+                  <Stack.Screen name="about/privacy" options={{ title: 'Privacy Policy' }} />
                 </Stack>
                 <StatusBar style="auto" />
               </ThemeProvider>

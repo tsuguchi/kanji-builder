@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LinkButton } from '@/components/ui/link-button';
 import { useProgressDb } from '@/db/progress-context';
 import { resetAllProgress } from '@/db/progress-queries';
 
@@ -52,6 +53,10 @@ export default function SettingsScreen() {
           <SettingsRow label="Reset all progress" onPress={handleResetProgress} destructive />
         </View>
 
+        <View style={styles.section}>
+          <SettingsLinkRow label="About" href="/about" />
+        </View>
+
         <View style={styles.footer}>
           <ThemedText style={styles.versionLabel}>Version</ThemedText>
           <ThemedText type="defaultSemiBold" style={styles.versionValue}>
@@ -89,6 +94,21 @@ function SettingsRow({
   );
 }
 
+function SettingsLinkRow({ label, href }: { label: string; href: '/about' }) {
+  // Route-based variant of SettingsRow — keeps Pressable patterns out of
+  // call sites that just need a screen transition. (Kept separate from
+  // SettingsRow so each shape stays explicit; same call-site choice as
+  // [[feedback-link-aschild-pressable]].)
+  return (
+    <LinkButton href={href} outerStyle={styles.linkRowOuter} innerStyle={styles.row}>
+      <ThemedText type="defaultSemiBold" style={styles.rowLabel}>
+        {label}
+      </ThemedText>
+      <ThemedText style={styles.chevron}>›</ThemedText>
+    </LinkButton>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -113,6 +133,9 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     opacity: 0.5,
+  },
+  linkRowOuter: {
+    // Pressable scope only — visible frame is the inner View row.
   },
   rowLabel: {
     flex: 1,
