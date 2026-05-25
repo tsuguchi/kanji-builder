@@ -119,6 +119,13 @@ data/bundle/
 # still regenerates it from `data/bundle/kanji.sqlite` via `npm run prepare-db`.
 !assets/data/kanji.sqlite
 
+# EXCEPTION: the Expo web export hashes its bundled assets and places them
+# under docs/app/assets/{node_modules,assets}/. The `node_modules/` and
+# `*.sqlite` rules above would otherwise swallow them. Negate the entire
+# docs/app/assets/ subtree so GitHub Pages can serve the actual files.
+!docs/app/assets/
+!docs/app/assets/**
+
 # KanjiVG SVGs (downloaded by pipeline)
 data/strokes/
 strokes/*.svg
