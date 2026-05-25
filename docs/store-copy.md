@@ -1,3 +1,7 @@
+---
+published: false
+---
+
 # Store copy — Kanji Builder
 
 App Store / Google Play 提出用のテキストドラフト。**英語をプライマリ**、日本語はローカライズ用。
