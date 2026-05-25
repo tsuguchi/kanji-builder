@@ -1,0 +1,21 @@
+# Jekyll config for GitHub Pages publication of docs/.
+#
+# To activate publishing:
+#   Repo Settings → Pages → Source = "Deploy from a branch"
+#   Branch = main, Folder = /docs
+#
+# Public pages (one per markdown file in this folder):
+#   /index.md  → https://tsuguchi.github.io/kanji-builder/
+#   /terms.md  → https://tsuguchi.github.io/kanji-builder/terms
+#   /privacy.md → https://tsuguchi.github.io/kanji-builder/privacy
+#
+# Internal pages have `published: false` in their frontmatter so they
+# don't show up at all (store-copy, release-checklist).
+
+title: Kanji Builder
+description: A kanji puzzle app for foreign Japanese learners.
+theme: jekyll-theme-minimal
+
+# Exclude editor / OS scratch files from any output.
+exclude:
+  - .DS_Store
